@@ -103,7 +103,8 @@ class VMwareHealthCheck:
         bp = {}
         hardware = host.hardware
         bp['cpu_model'] = hardware.cpuPkg[0].description if hardware.cpuPkg else 'n/a'
-        bp['memory_total'] = hardware.memorySize
+        # Convert memory size from bytes to gigabytes for easier readability
+        bp['memory_total_gb'] = hardware.memorySize / (1024 ** 3)
         bp['datastores'] = [ds.info.name for ds in host.datastore]
         bp['network'] = [nw.name for nw in host.network]
         return bp
