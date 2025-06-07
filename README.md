@@ -28,6 +28,7 @@ Este repositorio incluye una herramienta sencilla escrita en Python que se conec
    De forma predeterminada, `generate_report` buscará un archivo llamado
    `template.html` en el mismo directorio del script. Este repositorio
    incluye uno con un diseño minimalista y moderno listo para usar.
+Adicionalmente, se proporciona "template_serviit.html" con un formato extendido y botones para exportar o imprimir el informe.
 
 El script mostrará por pantalla un resumen de la información recopilada para cada host y para cada máquina virtual encontrada.
 El informe HTML incluye ahora un ranking con las 10 máquinas virtuales con mayor **CPU Ready** y tablas con métricas detalladas de CPU, memoria, disco y red por VM. Además, se recopila información de datastores, interfaces de red y firmware de cada host.
