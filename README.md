@@ -32,3 +32,4 @@ Si se desean añadir contadores de rendimiento adicionales por VM basta con prop
 - `cpu_usage_pct` y `mem_usage_pct`: porcentajes reales (1.0 corresponde al 100 %).
 - `disk_reads` y `disk_writes`: número medio de operaciones por intervalo.
 - `net_rx_kbps` y `net_tx_kbps`: velocidad media de recepción y envío en KB/s.
+
