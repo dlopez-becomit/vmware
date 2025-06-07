@@ -309,10 +309,12 @@ class VMwareHealthCheck:
         return {'ha_enabled': False, 'drs_enabled': False}
 
     def vm_extra_info(self, vm):
-        """Return snapshot presence and VMware Tools status."""
+        """Return snapshot presence, VMware Tools status and power state."""
         has_snap = hasattr(vm, 'snapshot') and vm.snapshot is not None
         tools = getattr(getattr(vm, 'guest', None), 'toolsStatus', 'unknown')
-        return {'has_snapshot': has_snap, 'tools_status': tools}
+        power = getattr(getattr(vm, 'runtime', None), 'powerState', None)
+        power = str(power) if power is not None else 'unknown'
+        return {'has_snapshot': has_snap, 'tools_status': tools, 'power_state': power}
 
     def best_practice_check(self, host):
         """Comprueba parámetros recomendados en un host."""
@@ -400,7 +402,8 @@ class VMwareHealthCheck:
 
         html.append(f"<img src='data:image/png;base64,{chart}' alt='Resource Usage Chart'/>")
 
-        top_vms = sorted(vm_data, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
+        running_vms = [v for v in vm_data if v['metrics'].get('power_state') == 'poweredOn']
+        top_vms = sorted(running_vms, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
         html.append("<h2>Top 10 VMs by CPU Ready</h2><table>")
         html.append("<tr><th>VM</th><th>CPU Ready (ms)</th></tr>")
         for v in top_vms:
@@ -585,8 +588,10 @@ class VMwareHealthCheck:
         ]
 
         # Top lists
-        top_cpu_ready = sorted(vm_data, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
-        top_ram = sorted(vm_data, key=lambda x: x['metrics'].get('mem_config_gb', 0), reverse=True)[:10]
+        running_vms = [v for v in vm_data if v['metrics'].get('power_state') == 'poweredOn']
+
+        top_cpu_ready = sorted(running_vms, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
+        top_ram = sorted(running_vms, key=lambda x: x['metrics'].get('mem_usage_gb', 0), reverse=True)[:10]
         datastores_list = [ds for h in hosts_data for ds in h.get('performance', {}).get('datastores', [])]
         datastores_sorted = sorted(datastores_list, key=lambda x: x.get('capacity_gb', 0), reverse=True)[:10]
 
@@ -598,10 +603,10 @@ class VMwareHealthCheck:
             else:
                 free = 0
             host_disk_free.append({'name': h.get('name'), 'free_pct': round(free, 2)})
-        top_disk_free = sorted(host_disk_free, key=lambda x: x['free_pct'], reverse=True)[:10]
+        top_disk_free = sorted(host_disk_free, key=lambda x: x['free_pct'])[:10]
 
-        top_iops = sorted(vm_data, key=lambda x: x['metrics'].get('iops', 0), reverse=True)[:10]
-        top_network = sorted(vm_data, key=lambda x: x['metrics'].get('net_throughput_kbps', 0), reverse=True)[:10]
+        top_iops = sorted(running_vms, key=lambda x: x['metrics'].get('iops', 0), reverse=True)[:10]
+        top_network = sorted(running_vms, key=lambda x: x['metrics'].get('net_throughput_kbps', 0), reverse=True)[:10]
 
         return {
             'health_score': health_score,
