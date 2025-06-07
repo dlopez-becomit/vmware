@@ -16,7 +16,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class VMwareHealthCheck:
+    """Recopila información básica de seguridad y rendimiento en VMware."""
+
     def __init__(self, host, user, password, port=443):
+        """Inicializa la conexión.
+
+        Parameters
+        ----------
+        host : str
+            Nombre o IP del vCenter/ESXi.
+        user : str
+            Usuario con permisos de acceso.
+        password : str
+            Contraseña del usuario.
+        port : int, optional
+            Puerto del servicio, por defecto ``443``.
+
+        Returns
+        -------
+        None
+        """
         self.host = host
         self.user = user
         self.password = password
@@ -24,6 +43,13 @@ class VMwareHealthCheck:
         self.si = None
 
     def connect(self):
+        """Establece la conexión con el servidor VMware.
+
+        Returns
+        -------
+        ServiceInstance
+            Objeto de conexión a vSphere.
+        """
         logger.info("Connecting to %s", self.host)
         context = ssl._create_unverified_context()
         try:
@@ -38,17 +64,19 @@ class VMwareHealthCheck:
         except vim.fault.InvalidLogin:
             logger.error("Invalid credentials for %s", self.host)
             raise
-        except Exception as exc:
+        except Exception:
             logger.exception("Error connecting to %s", self.host)
             raise
         return self.si
 
     def disconnect(self):
+        """Cierra la conexión actual si existe."""
         if self.si:
             logger.info("Disconnecting from %s", self.host)
             Disconnect(self.si)
 
     def get_hosts(self):
+        """Devuelve la lista de hosts gestionados."""
         logger.info("Retrieving hosts")
         content = self.si.RetrieveContent()
         container = content.viewManager.CreateContainerView(
@@ -60,6 +88,7 @@ class VMwareHealthCheck:
         return hosts
 
     def security_check(self, host):
+        """Realiza comprobaciones básicas de seguridad en un host."""
         logger.info("Running security checks on %s", host.name)
         summary = host.summary
         config = host.config
@@ -87,6 +116,7 @@ class VMwareHealthCheck:
         return security
 
     def performance_check(self, host):
+        """Obtiene métricas de rendimiento del host."""
         logger.info("Gathering performance metrics from %s", host.name)
         summary = host.summary
         stats = summary.quickStats
@@ -99,6 +129,7 @@ class VMwareHealthCheck:
         return perf
 
     def best_practice_check(self, host):
+        """Comprueba parámetros recomendados en un host."""
         logger.info("Checking best practices on %s", host.name)
         bp = {}
         hardware = host.hardware
@@ -109,6 +140,18 @@ class VMwareHealthCheck:
         return bp
 
     def _create_chart(self, hosts_data):
+        """Genera un gráfico de uso de CPU y memoria.
+
+        Parameters
+        ----------
+        hosts_data : list of dict
+            Datos recopilados de cada host.
+
+        Returns
+        -------
+        str
+            Imagen en base64 del gráfico.
+        """
         names = [h['name'] for h in hosts_data]
         cpu = [h['performance']['cpu_usage'] for h in hosts_data]
         mem = [h['performance']['memory_usage'] for h in hosts_data]
@@ -129,6 +172,15 @@ class VMwareHealthCheck:
         return encoded
 
     def generate_report(self, hosts_data, output_file):
+        """Crea un informe HTML con los datos obtenidos.
+
+        Parameters
+        ----------
+        hosts_data : list of dict
+            Información de los hosts analizados.
+        output_file : str
+            Ruta del archivo HTML de salida.
+        """
         logger.info("Generating HTML report: %s", output_file)
         chart = self._create_chart(hosts_data)
 
@@ -166,6 +218,7 @@ class VMwareHealthCheck:
 
 
 def main():
+    """Punto de entrada del script."""
     parser = argparse.ArgumentParser(description='VMware ESXi/vCenter Health Check')
     parser.add_argument('--host', required=True, help='vCenter or ESXi hostname/IP')
     parser.add_argument('--user', required=True, help='username')
