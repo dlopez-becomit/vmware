@@ -182,20 +182,20 @@
   <section class="container score-section">
     <div class="score-wrapper">
       <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 10px;">Health Score</div>
-      <div class="score-text">4.3</div>
-      <span class="health-status warning">Estable con Advertencias</span>
+      <div class="score-text">{{ health.score }}</div>
+      <span class="health-status {{ health.status_class }}">{{ health.status_text }}</span>
     </div>
     <div class="score-wrapper" style="align-items:flex-start;">
       <div class="metrics">
-        <div class="metric"><i class="fa-solid fa-clock"></i> Tiempo Activo: 370 días</div>
-        <div class="metric"><i class="fa-solid fa-bell"></i> Alertas: 2</div>
-        <div class="metric"><i class="fa-solid fa-check"></i> SLA: 98%</div>
+        <div class="metric"><i class="fa-solid fa-clock"></i> Tiempo Activo: {{ health.uptime_days }} días</div>
+        <div class="metric"><i class="fa-solid fa-bell"></i> Alertas: {{ health.alerts }}</div>
+        <div class="metric"><i class="fa-solid fa-check"></i> SLA: {{ health.sla }}%</div>
       </div>
       <div class="infra-summary">
-        <div><i class="fa-solid fa-server"></i> Hosts: <strong>3</strong></div>
-        <div><i class="fa-solid fa-desktop"></i> VMs: <strong>120</strong></div>
-        <div><i class="fa-solid fa-database"></i> Datastores: <strong>8</strong></div>
-        <div><i class="fa-solid fa-network-wired"></i> Redes: <strong>4</strong></div>
+        <div><i class="fa-solid fa-server"></i> Hosts: <strong>{{ infra.hosts }}</strong></div>
+        <div><i class="fa-solid fa-desktop"></i> VMs: <strong>{{ infra.vms }}</strong></div>
+        <div><i class="fa-solid fa-database"></i> Datastores: <strong>{{ infra.datastores }}</strong></div>
+        <div><i class="fa-solid fa-network-wired"></i> Redes: <strong>{{ infra.networks }}</strong></div>
       </div>
       <div class="quick-links">
         <a href="#" id="pdfBtn"><i class="fa-solid fa-file-pdf"></i> PDF</a>
@@ -208,30 +208,13 @@
   <section class="container categories-section">
     <h2><i class="fa-solid fa-chart-pie"></i> Resumen de Categorías</h2>
     <div class="categories-grid">
-      <!-- Tarjeta Rendimiento -->
-      <div class="category-card ok">
-        <h4><i class="fa-solid fa-tachometer-alt"></i> Rendimiento <span class="category-status">OK</span></h4>
-        <div class="category-progress"><span style="width: 85%;"></span></div>
-        <div class="category-score">85%</div>
+      {% for cat in categories %}
+      <div class="category-card {{ cat.status_class }}">
+        <h4><i class="{{ cat.icon }}"></i> {{ cat.name }} <span class="category-status">{{ cat.status }}</span></h4>
+        <div class="category-progress"><span style="width: {{ cat.percent }}%;"></span></div>
+        <div class="category-score">{{ cat.percent }}%</div>
       </div>
-      <!-- Tarjeta Almacenamiento -->
-      <div class="category-card warning">
-        <h4><i class="fa-solid fa-hdd"></i> Almacenamiento <span class="category-status">Warning</span></h4>
-        <div class="category-progress"><span style="width: 70%;"></span></div>
-        <div class="category-score">70%</div>
-      </div>
-      <!-- Tarjeta Seguridad -->
-      <div class="category-card critical">
-        <h4><i class="fa-solid fa-shield"></i> Seguridad <span class="category-status">Critical</span></h4>
-        <div class="category-progress"><span style="width: 60%;"></span></div>
-        <div class="category-score">60%</div>
-      </div>
-      <!-- Tarjeta Disponibilidad -->
-      <div class="category-card ok">
-        <h4><i class="fa-solid fa-plug-circle-bolt"></i> Disponibilidad <span class="category-status">OK</span></h4>
-        <div class="category-progress"><span style="width: 90%;"></span></div>
-        <div class="category-score">90%</div>
-      </div>
+      {% endfor %}
      </div>
   </section>
   
@@ -240,346 +223,90 @@
     <!-- Gráfico CPU -->
     <div class="graph-section">
       <h3><i class="fa-solid fa-microchip"></i> Uso de CPU (%) por Servidor</h3>
+      {% for host in hosts %}
       <div class="server-row">
-        <div class="server-label">Servidor 1</div>
+        <div class="server-label">{{ host.name }}</div>
         <div class="server-bar-container">
-          <div class="server-bar cpu-bar" style="width: 70%;">70%</div>
+          <div class="server-bar cpu-bar" style="width: {{ host.cpu_percent }}%;">{{ host.cpu_percent }}%</div>
         </div>
       </div>
-      <div class="server-row">
-        <div class="server-label">Servidor 2</div>
-        <div class="server-bar-container">
-          <div class="server-bar cpu-bar" style="width: 55%;">55%</div>
-        </div>
-      </div>
-      <div class="server-row">
-        <div class="server-label">Servidor 3</div>
-        <div class="server-bar-container">
-          <div class="server-bar cpu-bar" style="width: 85%;">85%</div>
-        </div>
-      </div>
+      {% endfor %}
     </div>
     <!-- Gráfico RAM -->
     <div class="graph-section">
       <h3><i class="fa-solid fa-memory"></i> Uso de RAM (GB) por Servidor</h3>
+      {% for host in hosts %}
       <div class="server-row">
-        <div class="server-label">Servidor 1</div>
+        <div class="server-label">{{ host.name }}</div>
         <div class="server-bar-container">
-          <div class="server-bar ram-bar" style="width: 60%;">6GB</div>
+          <div class="server-bar ram-bar" style="width: {{ host.memory_percent }}%;">{{ host.memory_used }}</div>
         </div>
       </div>
-      <div class="server-row">
-        <div class="server-label">Servidor 2</div>
-        <div class="server-bar-container">
-          <div class="server-bar ram-bar" style="width: 45%;">4.5GB</div>
-        </div>
-      </div>
-      <div class="server-row">
-        <div class="server-label">Servidor 3</div>
-        <div class="server-bar-container">
-          <div class="server-bar ram-bar" style="width: 75%;">7.5GB</div>
-        </div>
-      </div>
+      {% endfor %}
     </div>
     <!-- Gráfico Uso de Datastores -->
     <div class="graph-section">
       <h3><i class="fa-solid fa-database"></i> Uso de Datastores (%)</h3>
+      {% for ds in datastores %}
       <div class="datastore-row">
-        <div class="datastore-label">Datastore_A</div>
+        <div class="datastore-label">{{ ds.name }}</div>
         <div class="datastore-bar-container">
-          <div class="datastore-bar" style="width: 70%;">70%</div>
+          <div class="datastore-bar" style="width: {{ ds.percent }}%;">{{ ds.percent }}%</div>
         </div>
       </div>
-      <div class="datastore-row">
-        <div class="datastore-label">Datastore_B</div>
-        <div class="datastore-bar-container">
-          <div class="datastore-bar" style="width: 55%;">55%</div>
-        </div>
-      </div>
-      <div class="datastore-row">
-        <div class="datastore-label">Datastore_C</div>
-        <div class="datastore-bar-container">
-          <div class="datastore-bar" style="width: 80%;">80%</div>
-        </div>
-      </div>
+      {% endfor %}
     </div>
   </section>
   
   <!-- SECCIÓN ESTADO DE COMPONENTES CLAVE -->
   <section class="container indicator-section">
     <h2><i class="fa-solid fa-clipboard-check"></i> Estado de Componentes Clave</h2>
-    <div class="indicator-grid">
-      <!-- Elementos originales -->
-      <div class="indicator-card">
-        <i class="fa-solid fa-shield-halved"></i>
-        <p>HA</p>
-        <span class="status-critical">Desactivado</span>
+      <div class="indicator-grid">
+        {% for ind in indicators %}
+        <div class="indicator-card">
+          <i class="{{ ind.icon }}"></i>
+          <p>{{ ind.label }}</p>
+          <span class="status-{{ ind.status_class }}">{{ ind.status }}</span>
+        </div>
+        {% endfor %}
       </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-arrows-to-circle"></i>
-        <p>DRS</p>
-        <span class="status-critical">Desactivado</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-camera"></i>
-        <p>Snapshots</p>
-        <span class="status-warning">Warning</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-wrench"></i>
-        <p>VMware Tools</p>
-        <span class="status-warning">Warning</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-microchip"></i>
-        <p>CPU Ready</p>
-        <span class="status-critical">Critical</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-cloud"></i>
-        <p>Ballooning</p>
-        <span class="status-ok">OK</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-network-wired"></i>
-        <p>Resource Pooling</p>
-        <span class="status-ok">OK</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-terminal"></i>
-        <p>SSH</p>
-        <span class="status-ok">OK</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-sync"></i>
-        <p>Updates</p>
-        <span class="status-warning">Folder Inconsistency</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-skull-crossbones"></i>
-        <p>Zombie VMDK</p>
-        <span class="status-warning">Warning</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-hdd"></i>
-        <p>Storage</p>
-        <span class="status-ok">OK</span>
-      </div>
-      <!-- Nuevos elementos -->
-      <div class="indicator-card">
-        <i class="fa-solid fa-ban"></i>
-        <p>IP Version 6<br>Deshabilitado</p>
-        <span class="status-ok">OK</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-id-badge"></i>
-        <p>Licencias y<br>Asignación</p>
-        <span class="status-warning">Warning</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-layer-group"></i>
-        <p>Relación CPU<br>Virtual / Física</p>
-        <span class="status-warning">Warning</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-hard-drive"></i>
-        <p>IOPS y Round<br>Robin ISCSI</p>
-        <span class="status-ok">OK</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-robot"></i>
-        <p>Recolección de<br>CPU Ready</p>
-        <span class="status-critical">Critical</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-table"></i>
-        <p>Tabla: Uso CPU<br>(Ghz), % y Total<br>Asignada (Ghz)</p>
-        <span class="status-warning">Warning</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-sitemap"></i>
-        <p>Nombres DNS</p>
-        <span class="status-ok">OK</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-cloud-arrow-down"></i>
-        <p>Backup Config<br>vCenter</p>
-        <span class="status-critical">Critical</span>
-      </div>
-      <div class="indicator-card">
-        <i class="fa-solid fa-clock"></i>
-        <p>Servidor NTP<br>en Hosts</p>
-        <span class="status-ok">OK</span>
-      </div>
-    </div>
   </section>
   
   <!-- SECCIÓN TOP 10 LISTADOS -->
   <section class="container top-list">
     <h2><i class="fa-solid fa-list-ol"></i> Top 10 Listados</h2>
     <div class="table-grid">
-      <!-- Card 1: TOP 10 CPU Ready Time (ms) -->
+      {% for table in top_tables %}
       <div class="card">
-        <div class="card-header"><i class="fa-solid fa-microchip"></i> TOP 10 CPU Ready Time</div>
+        <div class="card-header"><i class="{{ table.icon }}"></i> {{ table.title }}</div>
         <div class="card-content">
           <table>
             <thead>
               <tr>
-                <th>VM</th>
-                <th>CPU Ready (ms)</th>
+                {% for header in table.headers %}
+                <th>{{ header }}</th>
+                {% endfor %}
               </tr>
             </thead>
             <tbody>
-              <tr><td>host-01</td><td>12.3</td></tr>
-              <tr><td>host-02</td><td>10.7</td></tr>
-              <tr><td>host-03</td><td>9.8</td></tr>
-              <tr><td>host-04</td><td>9.0</td></tr>
-              <tr><td>host-05</td><td>8.5</td></tr>
-              <tr><td>host-06</td><td>8.2</td></tr>
-              <tr><td>host-07</td><td>7.9</td></tr>
-              <tr><td>host-08</td><td>7.5</td></tr>
-              <tr><td>host-09</td><td>7.2</td></tr>
-              <tr><td>host-10</td><td>7.0</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <!-- Card 2: TOP 10 Prioridad RAM (GB) -->
-      <div class="card">
-        <div class="card-header"><i class="fa-solid fa-memory"></i> TOP 10 Prioridad RAM</div>
-        <div class="card-content">
-          <table>
-            <thead>
+              {% for row in table.rows %}
               <tr>
-                <th>VM</th>
-                <th>RAM (GB)</th>
+                {% for cell in row %}
+                <td>{{ cell }}</td>
+                {% endfor %}
               </tr>
-            </thead>
-            <tbody>
-              <tr><td>vm-Alpha</td><td>16</td></tr>
-              <tr><td>vm-Beta</td><td>14</td></tr>
-              <tr><td>vm-Gamma</td><td>12</td></tr>
-              <tr><td>vm-Delta</td><td>12</td></tr>
-              <tr><td>vm-Epsilon</td><td>10</td></tr>
-              <tr><td>vm-Zeta</td><td>10</td></tr>
-              <tr><td>vm-Eta</td><td>8</td></tr>
-              <tr><td>vm-Theta</td><td>8</td></tr>
-              <tr><td>vm-Iota</td><td>6</td></tr>
-              <tr><td>vm-Kappa</td><td>6</td></tr>
+              {% endfor %}
             </tbody>
           </table>
         </div>
       </div>
-      <!-- Card 3: DATASTORE (GB) -->
-      <div class="card">
-        <div class="card-header"><i class="fa-solid fa-database"></i> DATASTORE (GB)</div>
-        <div class="card-content">
-          <table>
-            <thead>
-              <tr>
-                <th>Datastore</th>
-                <th>Capacidad (GB)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>Datastore_A</td><td>500</td></tr>
-              <tr><td>Datastore_B</td><td>450</td></tr>
-              <tr><td>Datastore_C</td><td>400</td></tr>
-              <tr><td>Datastore_D</td><td>350</td></tr>
-              <tr><td>Datastore_E</td><td>300</td></tr>
-              <tr><td>Datastore_F</td><td>250</td></tr>
-              <tr><td>Datastore_G</td><td>200</td></tr>
-              <tr><td>Datastore_H</td><td>150</td></tr>
-              <tr><td>Datastore_I</td><td>100</td></tr>
-              <tr><td>Datastore_J</td><td>50</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <!-- Card 4: TOP 10 DISC FREE (%) -->
-      <div class="card">
-        <div class="card-header"><i class="fa-solid fa-hdd"></i> TOP 10 DISC FREE (%)</div>
-        <div class="card-content">
-          <table>
-            <thead>
-              <tr>
-                <th>VM</th>
-                <th>Disc Free (%)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>Host-A</td><td>85</td></tr>
-              <tr><td>Host-B</td><td>80</td></tr>
-              <tr><td>Host-C</td><td>78</td></tr>
-              <tr><td>Host-D</td><td>75</td></tr>
-              <tr><td>Host-E</td><td>72</td></tr>
-              <tr><td>Host-F</td><td>70</td></tr>
-              <tr><td>Host-G</td><td>68</td></tr>
-              <tr><td>Host-H</td><td>65</td></tr>
-              <tr><td>Host-I</td><td>63</td></tr>
-              <tr><td>Host-J</td><td>60</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <!-- Card 5: TOP 10 IOPS VM -->
-      <div class="card">
-        <div class="card-header"><i class="fa-solid fa-server"></i> TOP 10 IOPS VM</div>
-        <div class="card-content">
-          <table>
-            <thead>
-              <tr>
-                <th>VM</th>
-                <th>IOPS</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>vm-IOPS-01</td><td>1500</td></tr>
-              <tr><td>vm-IOPS-02</td><td>1400</td></tr>
-              <tr><td>vm-IOPS-03</td><td>1350</td></tr>
-              <tr><td>vm-IOPS-04</td><td>1300</td></tr>
-              <tr><td>vm-IOPS-05</td><td>1250</td></tr>
-              <tr><td>vm-IOPS-06</td><td>1200</td></tr>
-              <tr><td>vm-IOPS-07</td><td>1150</td></tr>
-              <tr><td>vm-IOPS-08</td><td>1100</td></tr>
-              <tr><td>vm-IOPS-09</td><td>1050</td></tr>
-              <tr><td>vm-IOPS-10</td><td>1000</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <!-- Card 6: TOP 10 USO Red Prom (MBps) -->
-      <div class="card">
-        <div class="card-header"><i class="fa-solid fa-network-wired"></i> TOP 10 USO Red Prom (MBps)</div>
-        <div class="card-content">
-          <table>
-            <thead>
-              <tr>
-                <th>Switch</th>
-                <th>Red Prom (MBps)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>Switch-01</td><td>120</td></tr>
-              <tr><td>Switch-02</td><td>115</td></tr>
-              <tr><td>Switch-03</td><td>110</td></tr>
-              <tr><td>Switch-04</td><td>105</td></tr>
-              <tr><td>Switch-05</td><td>100</td></tr>
-              <tr><td>Switch-06</td><td>95</td></tr>
-              <tr><td>Switch-07</td><td>90</td></tr>
-              <tr><td>Switch-08</td><td>85</td></tr>
-              <tr><td>Switch-09</td><td>80</td></tr>
-              <tr><td>Switch-10</td><td>75</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {% endfor %}
     </div>
   </section>
   
   <!-- FOOTER -->
   <footer class="container">
-    <p>Informe generado el 15 de mayo de 2023.</p>
+    <p>Informe generado el {{ generated_on }}.</p>
     <a href="#" class="export-btn" id="pdfBtn"><i class="fa-solid fa-file-export"></i> Exportar Reporte</a>
   </footer>
   
