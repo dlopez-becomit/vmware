@@ -93,7 +93,7 @@ class VMwareHealthCheck:
         perf = {
             'cpu_usage': stats.overallCpuUsage,
             'memory_usage': stats.overallMemoryUsage,
-            'num_vms': summary.runtime.numVms
+            'num_vms': len(getattr(host, 'vm', []))
         }
         # Additional metrics can be gathered from host.configManager or perfManager
         return perf
