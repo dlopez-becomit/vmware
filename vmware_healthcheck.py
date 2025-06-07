@@ -522,11 +522,17 @@ class VMwareHealthCheck:
         html.append(f"<img src='data:image/png;base64,{chart}' alt='Resource Usage Chart'/>")
 
         running_vms = [v for v in vm_data if v['metrics'].get('power_state') == 'poweredOn']
-        top_vms = sorted(running_vms, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
+        top_vms = sorted(
+            running_vms,
+            key=lambda x: x['metrics'].get('cpu_ready_ms') or 0,
+            reverse=True
+        )[:10]
         html.append("<h2>Top 10 VMs by CPU Ready</h2><table>")
         html.append("<tr><th>VM</th><th>CPU Ready (ms)</th></tr>")
         for v in top_vms:
-            html.append(f"<tr><td>{v['name']}</td><td>{v['metrics'].get('cpu_ready_ms', 0)}</td></tr>")
+            html.append(
+                f"<tr><td>{v['name']}</td><td>{v['metrics'].get('cpu_ready_ms') or 0}</td></tr>"
+            )
         html.append("</table>")
 
         for h in hosts_data:
@@ -605,7 +611,7 @@ class VMwareHealthCheck:
                 for vm in h['vms']:
                     m = vm['metrics']
                     html.append(
-                        f"<tr><td>{vm['name']}</td><td>{m.get('cpu_ready_ms', 0)}</td>"
+                        f"<tr><td>{vm['name']}</td><td>{m.get('cpu_ready_ms') or 0}</td>"
                         f"<td>{round(m.get('cpu_usage_pct', 0) * 100, 2)}</td>"
                         f"<td>{round(m.get('mem_usage_pct', 0) * 100, 2)}</td>"
                         f"<td>{m.get('disk_free_pct', 'n/a')}</td>"
@@ -636,7 +642,7 @@ class VMwareHealthCheck:
         total_datastores = sum(len(h.get('performance', {}).get('datastores', [])) for h in hosts_data)
         total_networks = sum(len(h.get('best_practice', {}).get('network', [])) for h in hosts_data)
 
-        all_ready = [v['metrics'].get('cpu_ready_ms', 0) for v in vm_data]
+        all_ready = [v['metrics'].get('cpu_ready_ms') or 0 for v in vm_data]
         avg_ready = sum(all_ready) / len(all_ready) if all_ready else 0
         performance_score = max(0, 100 - min(avg_ready, 200) / 2)
 
@@ -746,16 +752,20 @@ class VMwareHealthCheck:
 
         top_cpu_ready = sorted(
             running_vms,
-            key=lambda x: x['metrics'].get('cpu_ready_ms', 0),
+            key=lambda x: x['metrics'].get('cpu_ready_ms') or 0,
             reverse=True
         )[:10]
         top_ram = sorted(
             running_vms,
-            key=lambda x: x['metrics'].get('mem_usage_pct', 0),
+            key=lambda x: x['metrics'].get('mem_usage_pct') or 0,
             reverse=True
         )[:10]
         datastores_list = [ds for h in hosts_data for ds in h.get('performance', {}).get('datastores', [])]
-        datastores_sorted = sorted(datastores_list, key=lambda x: x.get('capacity_gb', 0), reverse=True)[:10]
+        datastores_sorted = sorted(
+            datastores_list,
+            key=lambda x: x.get('capacity_gb') or 0,
+            reverse=True
+        )[:10]
 
         vm_disk_free = []
         for vm in running_vms:
@@ -763,10 +773,21 @@ class VMwareHealthCheck:
             if free_pct is not None:
                 vm_disk_free.append({'name': vm['name'], 'free_pct': free_pct})
 
-        top_disk_free = sorted(vm_disk_free, key=lambda x: x['free_pct'])[:10]
+        top_disk_free = sorted(
+            vm_disk_free,
+            key=lambda x: x['free_pct'] if x['free_pct'] is not None else 0
+        )[:10]
 
-        top_iops = sorted(running_vms, key=lambda x: x['metrics'].get('iops', 0), reverse=True)[:10]
-        top_network = sorted(running_vms, key=lambda x: x['metrics'].get('net_throughput_kbps', 0), reverse=True)[:10]
+        top_iops = sorted(
+            running_vms,
+            key=lambda x: x['metrics'].get('iops') or 0,
+            reverse=True
+        )[:10]
+        top_network = sorted(
+            running_vms,
+            key=lambda x: x['metrics'].get('net_throughput_kbps') or 0,
+            reverse=True
+        )[:10]
 
         return {
             'health_score': health_score,
@@ -894,7 +915,9 @@ def main():
                 summary['vms'] += 1
 
             if vm_info:
-                avg_ready = sum(v['metrics'].get('cpu_ready_ms', 0) for v in vm_info) / len(vm_info)
+                avg_ready = sum(
+                    v['metrics'].get('cpu_ready_ms') or 0 for v in vm_info
+                ) / len(vm_info)
             else:
                 avg_ready = 0
             performance['avg_cpu_ready_ms'] = avg_ready
