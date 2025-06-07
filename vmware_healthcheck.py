@@ -744,8 +744,16 @@ class VMwareHealthCheck:
         # Top lists
         running_vms = [v for v in vm_data if v['metrics'].get('power_state') == 'poweredOn']
 
-        top_cpu_ready = sorted(running_vms, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
-        top_ram = sorted(running_vms, key=lambda x: x['metrics'].get('mem_usage_gb', 0), reverse=True)[:10]
+        top_cpu_ready = sorted(
+            running_vms,
+            key=lambda x: x['metrics'].get('cpu_ready_ms', 0),
+            reverse=True
+        )[:10]
+        top_ram = sorted(
+            running_vms,
+            key=lambda x: x['metrics'].get('mem_usage_pct', 0),
+            reverse=True
+        )[:10]
         datastores_list = [ds for h in hosts_data for ds in h.get('performance', {}).get('datastores', [])]
         datastores_sorted = sorted(datastores_list, key=lambda x: x.get('capacity_gb', 0), reverse=True)[:10]
 
@@ -803,6 +811,10 @@ class VMwareHealthCheck:
         """
         logger.info("Generating HTML report: %s", output_file)
         chart = self._create_chart(hosts_data)
+
+        if os.path.isabs(template_file):
+            template_dir = os.path.dirname(template_file)
+            template_file = os.path.basename(template_file)
 
         if template_dir is None:
             template_dir = os.path.dirname(os.path.abspath(__file__))
