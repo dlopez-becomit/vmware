@@ -2,11 +2,18 @@ import argparse
 import ssl
 import io
 import base64
+import logging
 from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class VMwareHealthCheck:
     def __init__(self, host, user, password, port=443):
@@ -17,22 +24,43 @@ class VMwareHealthCheck:
         self.si = None
 
     def connect(self):
+        logger.info("Connecting to %s", self.host)
         context = ssl._create_unverified_context()
-        self.si = SmartConnect(host=self.host, user=self.user, pwd=self.password, port=self.port, sslContext=context)
+        try:
+            self.si = SmartConnect(
+                host=self.host,
+                user=self.user,
+                pwd=self.password,
+                port=self.port,
+                sslContext=context,
+            )
+            logger.info("Connection established")
+        except vim.fault.InvalidLogin:
+            logger.error("Invalid credentials for %s", self.host)
+            raise
+        except Exception as exc:
+            logger.exception("Error connecting to %s", self.host)
+            raise
         return self.si
 
     def disconnect(self):
         if self.si:
+            logger.info("Disconnecting from %s", self.host)
             Disconnect(self.si)
 
     def get_hosts(self):
+        logger.info("Retrieving hosts")
         content = self.si.RetrieveContent()
-        container = content.viewManager.CreateContainerView(content.rootFolder, [vim.HostSystem], True)
+        container = content.viewManager.CreateContainerView(
+            content.rootFolder, [vim.HostSystem], True
+        )
         hosts = list(container.view)
         container.Destroy()
+        logger.info("Found %d host(s)", len(hosts))
         return hosts
 
     def security_check(self, host):
+        logger.info("Running security checks on %s", host.name)
         summary = host.summary
         config = host.config
         security = {}
@@ -48,6 +76,7 @@ class VMwareHealthCheck:
         return security
 
     def performance_check(self, host):
+        logger.info("Gathering performance metrics from %s", host.name)
         summary = host.summary
         stats = summary.quickStats
         perf = {
@@ -59,6 +88,7 @@ class VMwareHealthCheck:
         return perf
 
     def best_practice_check(self, host):
+        logger.info("Checking best practices on %s", host.name)
         bp = {}
         hardware = host.hardware
         bp['cpu_model'] = hardware.cpuPkg[0].description if hardware.cpuPkg else 'n/a'
@@ -88,6 +118,7 @@ class VMwareHealthCheck:
         return encoded
 
     def generate_report(self, hosts_data, output_file):
+        logger.info("Generating HTML report: %s", output_file)
         chart = self._create_chart(hosts_data)
 
         html = [
@@ -132,39 +163,41 @@ def main():
     args = parser.parse_args()
 
     checker = VMwareHealthCheck(args.host, args.user, args.password)
-    checker.connect()
+    try:
+        checker.connect()
 
-    hosts = checker.get_hosts()
-    hosts_data = []
-    for host in hosts:
-        print('--- Host: {} ---'.format(host.name))
-        security = checker.security_check(host)
-        performance = checker.performance_check(host)
-        best_practice = checker.best_practice_check(host)
+        hosts = checker.get_hosts()
+        hosts_data = []
+        for host in hosts:
+            logger.info("Processing host %s", host.name)
+            security = checker.security_check(host)
+            performance = checker.performance_check(host)
+            best_practice = checker.best_practice_check(host)
 
-        print('Security:')
-        for k, v in security.items():
-            print('  {}: {}'.format(k, v))
-        print('Performance:')
-        for k, v in performance.items():
-            print('  {}: {}'.format(k, v))
-        print('Best Practices:')
-        for k, v in best_practice.items():
-            print('  {}: {}'.format(k, v))
-        print()
+            print('--- Host: {} ---'.format(host.name))
+            print('Security:')
+            for k, v in security.items():
+                print('  {}: {}'.format(k, v))
+            print('Performance:')
+            for k, v in performance.items():
+                print('  {}: {}'.format(k, v))
+            print('Best Practices:')
+            for k, v in best_practice.items():
+                print('  {}: {}'.format(k, v))
+            print()
 
-        hosts_data.append({
-            'name': host.name,
-            'security': security,
-            'performance': performance,
-            'best_practice': best_practice
-        })
+            hosts_data.append({
+                'name': host.name,
+                'security': security,
+                'performance': performance,
+                'best_practice': best_practice
+            })
 
-    if args.output:
-        checker.generate_report(hosts_data, args.output)
-        print(f"HTML report written to {args.output}")
-
-    checker.disconnect()
+        if args.output:
+            checker.generate_report(hosts_data, args.output)
+            logger.info("HTML report written to %s", args.output)
+    finally:
+        checker.disconnect()
 
 if __name__ == '__main__':
     main()
