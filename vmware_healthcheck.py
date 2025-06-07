@@ -95,7 +95,9 @@ class VMwareHealthCheck:
         security = {}
         security['name'] = summary.config.name
         security['version'] = summary.config.product.fullName
-        security['lockdown_mode'] = config.adminDisabled
+        # "lockdownMode" reflects whether the host restricts direct remote
+        # management access (normal, lockdown or strict modes)
+        security['lockdown_mode'] = config.lockdownMode
         security['services'] = {
             'ssh': any(s.key == 'TSM-SSH' and s.running for s in host.configManager.serviceSystem.serviceInfo.service),
             'esxi_shell': any(s.key == 'TSM' and s.running for s in host.configManager.serviceSystem.serviceInfo.service)
