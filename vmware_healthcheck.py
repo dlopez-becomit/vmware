@@ -319,9 +319,12 @@ class VMwareHealthCheck:
 
         html = [
             "<html><head><meta charset='utf-8'><title>VMware Health Check</title>",
-            "<style>body{font-family:Arial;}table{border-collapse:collapse;}",
+            "<style>",
+            "body{font-family:Arial;margin:0;padding:0;display:flex;justify-content:center;}",
+            ".container{max-width:900px;width:100%;padding:20px;}",
+            "table{border-collapse:collapse;width:100%;}",
             "th,td{border:1px solid #ccc;padding:4px;}h1,h2{color:#2c3e50;}",
-            "</style></head><body>"
+            "</style></head><body><div class='container'>"
         ]
         html.append("<h1>VMware Health Check Report</h1>")
 
@@ -404,7 +407,7 @@ class VMwareHealthCheck:
                     )
                 html.append("</table>")
 
-        html.append("</body></html>")
+        html.append("</div></body></html>")
 
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write('\n'.join(html))
