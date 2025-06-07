@@ -232,6 +232,8 @@ class VMwareHealthCheck:
         ----------
         hosts_data : list of dict
             Información de los hosts analizados.
+        vm_data : list of dict
+            Métricas agregadas de las máquinas virtuales.
         output_file : str
             Ruta del archivo HTML de salida.
         """
