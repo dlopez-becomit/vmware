@@ -5,7 +5,7 @@ Este repositorio incluye una herramienta sencilla escrita en Python que se conec
 ## Requisitos
 
 - Python 3.8+
-- Dependencias indicadas en `requirements.txt` (`pyvmomi`, `matplotlib`)
+- Dependencias indicadas en `requirements.txt` (`pyvmomi`, `matplotlib`, `jinja2`)
 
 ## Instalación
 
