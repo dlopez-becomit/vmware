@@ -3,6 +3,7 @@ import ssl
 import io
 import base64
 import logging
+import os
 from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
 import matplotlib
@@ -145,7 +146,12 @@ class VMwareHealthCheck:
 
         # Basic information about physical NICs
         nic_stats = []
-        for pnic in getattr(host.config.network, 'pnic', []):
+        pnic_list = getattr(getattr(host.config, 'network', None), 'pnic', None)
+        if pnic_list is None:
+            pnic_list = getattr(getattr(host, 'network', None), 'pnic', None)
+        if pnic_list is None:
+            pnic_list = []
+        for pnic in pnic_list:
             nic_stats.append({
                 'device': pnic.device,
                 'speed_mb': getattr(getattr(pnic, 'linkSpeed', None), 'speedMb', 'n/a')
@@ -155,9 +161,9 @@ class VMwareHealthCheck:
         # Firmware information can also be interesting from a performance point of view
         hw = host.hardware
         perf['firmware'] = {
-            'bios_version': getattr(hw.biosInfo, 'biosVersion', 'n/a'),
-            'vendor': getattr(hw.systemInfo, 'vendor', 'n/a'),
-            'model': getattr(hw.systemInfo, 'model', 'n/a'),
+            'bios_version': getattr(getattr(hw, 'biosInfo', None), 'biosVersion', 'n/a'),
+            'vendor': getattr(getattr(hw, 'systemInfo', None), 'vendor', 'n/a'),
+            'model': getattr(getattr(hw, 'systemInfo', None), 'model', 'n/a'),
         }
 
         # Additional metrics can be gathered from host.configManager or perfManager
@@ -242,33 +248,32 @@ class VMwareHealthCheck:
         bp['memory_total_gb'] = hardware.memorySize / (1024 ** 3)
 
         # Detailed datastore information
-        datastore_info = []
+        datastore_names = []
         for ds in host.datastore:
             try:
-                summary = ds.summary
-                datastore_info.append({
-                    'name': summary.name,
-                    'capacity_gb': summary.capacity / (1024 ** 3),
-                    'free_gb': summary.freeSpace / (1024 ** 3)
-                })
+                info = getattr(ds, 'summary', getattr(ds, 'info', None))
+                if info and hasattr(info, 'name'):
+                    datastore_names.append(info.name)
             except Exception:
                 continue
-        bp['datastores'] = datastore_info
+        bp['datastores'] = datastore_names
 
         # Basic network interface details
         nic_info = []
-        for pnic in getattr(host.config.network, 'pnic', []):
-            nic_info.append({
-                'device': pnic.device,
-                'speed_mb': getattr(getattr(pnic, 'linkSpeed', None), 'speedMb', 'n/a')
-            })
-        bp['network'] = nic_info
-
+        pnic_list = getattr(getattr(host.config, "network", None), "pnic", None)
+        if pnic_list is not None:
+            for pnic in pnic_list:
+                nic_info.append({"device": pnic.device, "speed_mb": getattr(getattr(pnic, "linkSpeed", None), "speedMb", "n/a")})
+        else:
+            for nic in getattr(host, "network", []):
+                if hasattr(nic, "name"):
+                    nic_info.append(nic.name)
+        bp["network"] = nic_info
         # Firmware information
         bp['firmware'] = {
-            'bios_version': getattr(hardware.biosInfo, 'biosVersion', 'n/a'),
-            'vendor': getattr(hardware.systemInfo, 'vendor', 'n/a'),
-            'model': getattr(hardware.systemInfo, 'model', 'n/a'),
+            'bios_version': getattr(getattr(hardware, 'biosInfo', None), 'biosVersion', 'n/a'),
+            'vendor': getattr(getattr(hardware, 'systemInfo', None), 'vendor', 'n/a'),
+            'model': getattr(getattr(hardware, 'systemInfo', None), 'model', 'n/a'),
         }
         return bp
 
@@ -304,19 +309,8 @@ class VMwareHealthCheck:
         encoded = base64.b64encode(buffer.getvalue()).decode()
         return encoded
 
-    def generate_report(self, hosts_data, vm_data, output_file):
-        """Crea un informe HTML con los datos obtenidos.
-
-        Parameters
-        ----------
-        hosts_data : list of dict
-            Información de los hosts analizados.
-        output_file : str
-            Ruta del archivo HTML de salida.
-        """
-        logger.info("Generating HTML report: %s", output_file)
-        chart = self._create_chart(hosts_data)
-
+    def _generate_report_default(self, hosts_data, vm_data, chart):
+        """Genera el informe HTML utilizando la plantilla incorporada."""
         html = [
             "<html><head><meta charset='utf-8'><title>VMware Health Check</title>",
             "<style>",
@@ -324,7 +318,7 @@ class VMwareHealthCheck:
             ".container{max-width:900px;width:100%;padding:20px;}",
             "table{border-collapse:collapse;width:100%;}",
             "th,td{border:1px solid #ccc;padding:4px;}h1,h2{color:#2c3e50;}",
-            "</style></head><body><div class='container'>"
+            "</style></head><body><div class='container'>",
         ]
         html.append("<h1>VMware Health Check Report</h1>")
 
@@ -408,9 +402,38 @@ class VMwareHealthCheck:
                 html.append("</table>")
 
         html.append("</div></body></html>")
+        return '\n'.join(html)
+
+    def generate_report(self, hosts_data, vm_data, output_file, template_dir=None):
+        """Crea un informe HTML con los datos obtenidos.
+
+        Parameters
+        ----------
+        hosts_data : list of dict
+            Información de los hosts analizados.
+        output_file : str
+            Ruta del archivo HTML de salida.
+        template_dir : str, optional
+            Directorio donde se encuentra ``template.html``. Si no se indica
+            se utilizará el directorio del script.
+        """
+        logger.info("Generating HTML report: %s", output_file)
+        chart = self._create_chart(hosts_data)
+
+        if template_dir is None:
+            template_dir = os.path.dirname(os.path.abspath(__file__))
+
+        try:
+            import jinja2
+            env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
+            template = env.get_template('template.html')
+            html_content = template.render(hosts=hosts_data, vms=vm_data, chart=chart)
+        except Exception as exc:
+            logger.debug("Using default HTML template: %s", exc)
+            html_content = self._generate_report_default(hosts_data, vm_data, chart)
 
         with open(output_file, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(html))
+            f.write(html_content)
 
 
 def main():
@@ -420,6 +443,7 @@ def main():
     parser.add_argument('--user', required=True, help='username')
     parser.add_argument('--password', required=True, help='password')
     parser.add_argument('--output', help='HTML report file')
+    parser.add_argument('--template', help='directory containing template.html')
     args = parser.parse_args()
 
     checker = VMwareHealthCheck(args.host, args.user, args.password)
@@ -469,7 +493,7 @@ def main():
             })
 
         if args.output:
-            checker.generate_report(hosts_data, all_vms, args.output)
+            checker.generate_report(hosts_data, all_vms, args.output, args.template)
             logger.info("HTML report written to %s", args.output)
     finally:
         checker.disconnect()
