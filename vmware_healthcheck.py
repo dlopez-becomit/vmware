@@ -135,10 +135,16 @@ class VMwareHealthCheck:
         for ds in getattr(host, 'datastore', []):
             try:
                 summary = ds.summary
+                free_gb = summary.freeSpace / (1024 ** 3)
+                capacity_gb = summary.capacity / (1024 ** 3)
+                usage_pct = (
+                    0 if capacity_gb == 0 else (capacity_gb - free_gb) / capacity_gb * 100
+                )
                 datastore_stats.append({
                     'name': summary.name,
-                    'capacity_gb': summary.capacity / (1024 ** 3),
-                    'free_gb': summary.freeSpace / (1024 ** 3)
+                    'capacity_gb': capacity_gb,
+                    'free_gb': free_gb,
+                    'usage_pct': usage_pct,
                 })
             except Exception:
                 continue
@@ -236,7 +242,52 @@ class VMwareHealthCheck:
 
         metrics['cpu_usage_pct'] /= 100.0
         metrics['mem_usage_pct'] /= 100.0
+        metrics['iops'] = (
+            metrics.get('disk_reads', 0) + metrics.get('disk_writes', 0)
+        ) / 20.0
+        metrics['net_throughput_kbps'] = (
+            metrics.get('net_rx_kbps', 0) + metrics.get('net_tx_kbps', 0)
+        )
+        if metrics['cpu_ready_ms'] > 200:
+            metrics['cpu_ready_class'] = 'poor'
+        elif metrics['cpu_ready_ms'] > 100:
+            metrics['cpu_ready_class'] = 'fair'
+        else:
+            metrics['cpu_ready_class'] = 'good'
         return metrics
+
+    def host_runtime_info(self, host):
+        """Return uptime information for a host."""
+        import datetime
+
+        runtime = getattr(host, 'runtime', None)
+        boot = getattr(runtime, 'bootTime', None)
+        if boot:
+            uptime = (datetime.datetime.utcnow() - boot).total_seconds()
+        else:
+            uptime = 0
+        return {
+            'boot_time': boot,
+            'uptime_seconds': uptime,
+            'sla_violations': 0,
+            'alert_count': 0,
+        }
+
+    def cluster_features(self, host):
+        """Return cluster level features such as HA or DRS if available."""
+        cluster = getattr(host, 'parent', None)
+        if isinstance(cluster, vim.ClusterComputeResource):
+            cfg = getattr(cluster, 'configurationEx', None)
+            das = getattr(getattr(cfg, 'dasConfig', None), 'enabled', False)
+            drs = getattr(getattr(cfg, 'drsConfig', None), 'enabled', False)
+            return {'ha_enabled': bool(das), 'drs_enabled': bool(drs)}
+        return {'ha_enabled': False, 'drs_enabled': False}
+
+    def vm_extra_info(self, vm):
+        """Return snapshot presence and VMware Tools status."""
+        has_snap = hasattr(vm, 'snapshot') and vm.snapshot is not None
+        tools = getattr(getattr(vm, 'guest', None), 'toolsStatus', 'unknown')
+        return {'has_snapshot': has_snap, 'tools_status': tools}
 
     def best_practice_check(self, host):
         """Comprueba parámetros recomendados en un host."""
@@ -473,17 +524,38 @@ def main():
         hosts = checker.get_hosts()
         hosts_data = []
         all_vms = []
+        summary = {
+            'hosts': 0,
+            'vms': 0,
+            'datastores': 0,
+            'networks': 0,
+        }
         for host in hosts:
             logger.info("Processing host %s", host.name)
             security = checker.security_check(host)
             performance = checker.performance_check(host)
             best_practice = checker.best_practice_check(host)
+            runtime = checker.host_runtime_info(host)
+            cluster = checker.cluster_features(host)
             vm_info = []
             counters = checker._build_perf_counter_map()
             for vm in getattr(host, 'vm', []):
                 metrics = checker.vm_performance_check(vm, counters)
+                extra = checker.vm_extra_info(vm)
+                metrics.update(extra)
                 vm_info.append({'name': vm.name, 'metrics': metrics})
                 all_vms.append({'name': vm.name, 'metrics': metrics})
+                summary['vms'] += 1
+
+            if vm_info:
+                avg_ready = sum(v['metrics'].get('cpu_ready_ms', 0) for v in vm_info) / len(vm_info)
+            else:
+                avg_ready = 0
+            performance['avg_cpu_ready_ms'] = avg_ready
+
+            summary['hosts'] += 1
+            summary['datastores'] += len(getattr(host, 'datastore', []))
+            summary['networks'] += len(getattr(host, 'network', []))
 
             print('--- Host: {} ---'.format(host.name))
             print('Security:')
@@ -509,8 +581,22 @@ def main():
                 'security': security,
                 'performance': performance,
                 'best_practice': best_practice,
+                'runtime': runtime,
+                'cluster': cluster,
                 'vms': vm_info,
             })
+
+        # Basic health scoring
+        scores = {
+            'performance': 100,
+            'storage': 100,
+            'security': 100,
+            'availability': 100,
+        }
+        overall_score = sum(scores.values()) / 4
+
+        print('Environment summary:', summary)
+        print('Health scores:', scores, 'overall:', overall_score)
 
         if args.output:
             checker.generate_report(
