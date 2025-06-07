@@ -48,7 +48,7 @@ Adicionalmente, la versión actual realiza comprobaciones básicas de:
 - Búsqueda de VMDK "zombies" no asociados a una VM.
 - Presencia de snapshots como indicativo de copias de seguridad.
 
-El informe generado con `template_a.html` muestra nuevas secciones: un **Health Score** con métricas globales, un resumen por categorías (rendimiento, almacenamiento, seguridad y disponibilidad), indicadores de componentes clave y varias tablas con los 10 elementos más relevantes (CPU Ready, uso de RAM, capacidad de datastores, IOPS y tráfico de red).
+El informe generado con `template_a.html` muestra nuevas secciones: un **Health Score** con métricas globales, un resumen por categorías (rendimiento, almacenamiento, seguridad y disponibilidad), indicadores de componentes clave y varias tablas con los 10 elementos más relevantes (CPU Ready, uso de RAM, capacidad de datastores, espacio libre de discos por VM, IOPS y tráfico de red).
 
 
 El script mostrará por pantalla un resumen de la información recopilada para cada host y para cada máquina virtual encontrada.
@@ -64,4 +64,5 @@ Si se desean añadir contadores de rendimiento adicionales por VM basta con prop
 - `cpu_usage_pct` y `mem_usage_pct`: porcentajes reales (1.0 corresponde al 100 %).
 - `disk_reads` y `disk_writes`: número medio de operaciones por intervalo.
 - `net_rx_kbps` y `net_tx_kbps`: velocidad media de recepción y envío en KB/s.
+- `disk_free_pct`: porcentaje de espacio libre en los discos virtuales de cada VM.
 
