@@ -282,7 +282,8 @@ class VMwareHealthCheck:
         # Ballooned memory reported by the guest (in MB)
         qs = getattr(vm, 'summary', None)
         qs = getattr(qs, 'quickStats', None)
-        metrics['ballooned_memory_mb'] = getattr(qs, 'balloonedMemory', 0)
+        ballooned = getattr(qs, 'balloonedMemory', 0)
+        metrics['ballooned_memory_mb'] = 0 if ballooned is None else ballooned
 
         if metrics['cpu_ready_ms'] > 200:
             metrics['cpu_ready_class'] = 'poor'
@@ -712,7 +713,7 @@ class VMwareHealthCheck:
         licenses = self.licensing_check()
         backups = self.backup_config_check(vm_data)
 
-        ballooning = any(vm['metrics'].get('ballooned_memory_mb', 0) > 0 for vm in vm_data)
+        ballooning = any((vm['metrics'].get('ballooned_memory_mb') or 0) > 0 for vm in vm_data)
         update_ok = all(h.get('update_ok', True) for h in hosts_data)
         storage_warn = any(h.get('storage_warn') for h in hosts_data)
         ipv6_enabled = any(h.get('security', {}).get('ipv6_enabled') for h in hosts_data)
