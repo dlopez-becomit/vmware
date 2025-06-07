@@ -71,7 +71,13 @@ class VMwareHealthCheck:
             'ssh': any(s.key == 'TSM-SSH' and s.running for s in host.configManager.serviceSystem.serviceInfo.service),
             'esxi_shell': any(s.key == 'TSM' and s.running for s in host.configManager.serviceSystem.serviceInfo.service)
         }
-        security['ntp_servers'] = [ntp.server for ntp in (config.dateTimeInfo.ntpConfig.server or [])]
+        ntp_cfg = getattr(getattr(config.dateTimeInfo, 'ntpConfig', None), 'server', None)
+        if isinstance(ntp_cfg, (list, tuple)):
+            security['ntp_servers'] = list(ntp_cfg)
+        elif ntp_cfg:
+            security['ntp_servers'] = [ntp_cfg]
+        else:
+            security['ntp_servers'] = []
         security['firewall_exceptions'] = [rule.key for rule in host.configManager.firewallSystem.firewallInfo.rules]
         return security
 
