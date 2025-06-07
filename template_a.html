@@ -295,20 +295,20 @@
           </table>
         </div>
       </div>
-      <!-- Card 2: TOP 10 Prioridad RAM (GB) -->
+      <!-- Card 2: TOP 10 RAM Promedio (%) -->
       <div class="card">
-        <div class="card-header"><i class="fa-solid fa-memory"></i> TOP 10 Prioridad RAM</div>
+        <div class="card-header"><i class="fa-solid fa-memory"></i> TOP 10 RAM Promedio</div>
         <div class="card-content">
           <table>
             <thead>
               <tr>
                 <th>VM</th>
-                <th>RAM (GB)</th>
+                <th>RAM (%)</th>
               </tr>
             </thead>
             <tbody>
               {% for vm in top_ram %}
-              <tr><td>{{ vm.name }}</td><td>{{ vm.metrics.mem_usage_gb }}</td></tr>
+              <tr><td>{{ vm.name }}</td><td>{{ (vm.metrics.mem_usage_pct * 100) | round(2) }}</td></tr>
               {% endfor %}
             </tbody>
           </table>
