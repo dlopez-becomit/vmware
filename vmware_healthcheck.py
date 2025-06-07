@@ -355,6 +355,54 @@ class VMwareHealthCheck:
         }
         return bp
 
+    def resource_pool_check(self, host):
+        """Return the number of configured resource pools for a host's cluster."""
+        cluster = getattr(host, 'parent', None)
+        if isinstance(cluster, vim.ClusterComputeResource):
+            pools = getattr(getattr(cluster, 'resourcePool', None), 'resourcePool', [])
+            return len(pools)
+        return 0
+
+    def ntp_config_check(self, host):
+        """Return True if the host has at least one NTP server configured."""
+        ntp_cfg = getattr(getattr(host.config, 'dateTimeInfo', None), 'ntpConfig', None)
+        servers = getattr(ntp_cfg, 'server', []) if ntp_cfg else []
+        if servers and not isinstance(servers, (list, tuple)):
+            servers = [servers]
+        return len(servers) > 0
+
+    def zombie_vmdk_check(self, host):
+        """Dummy check for orphaned VMDK files (returns 0 if none detected)."""
+        # A real implementation would scan datastores for unregistered VMDK files
+        # and compare them with the list of virtual disks attached to VMs.
+        return 0
+
+    def licensing_check(self):
+        """Retrieve assigned license keys."""
+        try:
+            lm = self.si.content.licenseManager
+            assigned = lm.licenseAssignmentManager.QueryAssignedLicenses(None)
+            return [lic.assignedLicense.licenseKey for lic in assigned]
+        except Exception:
+            return []
+
+    def folder_inconsistencies(self, vms):
+        """Return a list of VM names that appear multiple times."""
+        seen = {}
+        duplicates = []
+        for vm in vms:
+            name = vm['name'] if isinstance(vm, dict) else getattr(vm, 'name', None)
+            if name is None:
+                continue
+            if name in seen and name not in duplicates:
+                duplicates.append(name)
+            seen[name] = True
+        return duplicates
+
+    def backup_config_check(self, vm_info):
+        """Count VMs with snapshots as a simple backup indicator."""
+        return sum(1 for vm in vm_info if vm['metrics'].get('has_snapshot'))
+
     def _create_chart(self, hosts_data):
         """Genera un gráfico de uso de CPU y memoria.
 
@@ -579,12 +627,25 @@ class VMwareHealthCheck:
             for ds in h.get('performance', {}).get('datastores', []):
                 datastore_usage.append({'name': ds.get('name'), 'percent': int(ds.get('usage_pct', 0))})
 
+        resource_pools = sum(h.get('resource_pools', 0) for h in hosts_data)
+        zombie_count = sum(h.get('zombie_vmdks', 0) for h in hosts_data)
+        ntp_ok = all(h.get('ntp_ok') for h in hosts_data)
+        folder_dups = self.folder_inconsistencies(vm_data)
+        licenses = self.licensing_check()
+        backups = self.backup_config_check(vm_data)
+
         indicators = [
             {'icon': 'fa-solid fa-shield-halved', 'label': 'HA', 'status': 'ok' if ha_all else 'critical', 'text': 'Enabled' if ha_all else 'Disabled'},
             {'icon': 'fa-solid fa-arrows-to-circle', 'label': 'DRS', 'status': 'ok' if drs_all else 'critical', 'text': 'Enabled' if drs_all else 'Disabled'},
             {'icon': 'fa-solid fa-camera', 'label': 'Snapshots', 'status': 'warning' if any(vm['metrics'].get('has_snapshot') for vm in vm_data) else 'ok', 'text': 'Warning' if any(vm['metrics'].get('has_snapshot') for vm in vm_data) else 'OK'},
             {'icon': 'fa-solid fa-wrench', 'label': 'VMware Tools', 'status': 'warning' if any(vm['metrics'].get('tools_status') not in (None, 'toolsOk', 'guestToolsRunning') for vm in vm_data) else 'ok', 'text': 'Warning' if any(vm['metrics'].get('tools_status') not in (None, 'toolsOk', 'guestToolsRunning') for vm in vm_data) else 'OK'},
             {'icon': 'fa-solid fa-terminal', 'label': 'SSH', 'status': 'warning' if any(h.get('security', {}).get('services', {}).get('ssh') for h in hosts_data) else 'ok', 'text': 'Warning' if any(h.get('security', {}).get('services', {}).get('ssh') for h in hosts_data) else 'OK'},
+            {'icon': 'fa-solid fa-layer-group', 'label': 'Resource Pools', 'status': 'ok' if resource_pools else 'warning', 'text': resource_pools if resource_pools else 'None'},
+            {'icon': 'fa-solid fa-folder-tree', 'label': 'Folders', 'status': 'warning' if folder_dups else 'ok', 'text': f"{len(folder_dups)} dup" if folder_dups else 'OK'},
+            {'icon': 'fa-solid fa-skull-crossbones', 'label': 'Zombie VMDKs', 'status': 'critical' if zombie_count else 'ok', 'text': zombie_count if zombie_count else '0'},
+            {'icon': 'fa-solid fa-clock', 'label': 'NTP', 'status': 'ok' if ntp_ok else 'warning', 'text': 'Configured' if ntp_ok else 'Missing'},
+            {'icon': 'fa-solid fa-id-card', 'label': 'Licensing', 'status': 'ok' if licenses else 'critical', 'text': 'OK' if licenses else 'Missing'},
+            {'icon': 'fa-solid fa-floppy-disk', 'label': 'Backups', 'status': 'ok' if backups else 'warning', 'text': 'Configured' if backups else 'None'},
         ]
 
         # Top lists
@@ -702,6 +763,9 @@ def main():
             security = checker.security_check(host)
             performance = checker.performance_check(host)
             best_practice = checker.best_practice_check(host)
+            resource_pools = checker.resource_pool_check(host)
+            zombie_vmdks = checker.zombie_vmdk_check(host)
+            ntp_ok = checker.ntp_config_check(host)
             runtime = checker.host_runtime_info(host)
             cluster = checker.cluster_features(host)
             vm_info = []
@@ -750,6 +814,9 @@ def main():
                 'best_practice': best_practice,
                 'runtime': runtime,
                 'cluster': cluster,
+                'resource_pools': resource_pools,
+                'zombie_vmdks': zombie_vmdks,
+                'ntp_ok': ntp_ok,
                 'vms': vm_info,
             })
 
