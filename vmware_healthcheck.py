@@ -78,7 +78,12 @@ class VMwareHealthCheck:
             security['ntp_servers'] = [ntp_cfg]
         else:
             security['ntp_servers'] = []
-        security['firewall_exceptions'] = [rule.key for rule in host.configManager.firewallSystem.firewallInfo.rules]
+        firewall_info = host.configManager.firewallSystem.firewallInfo
+        # `vim.host.FirewallInfo` exposes its rules via the `ruleset` attribute
+        # in pyVmomi. Each ruleset represents a named group of firewall rules
+        # that can be enabled or disabled. Collect the identifiers for all
+        # configured rulesets so they can be reported.
+        security['firewall_exceptions'] = [rs.key for rs in getattr(firewall_info, 'ruleset', [])]
         return security
 
     def performance_check(self, host):
