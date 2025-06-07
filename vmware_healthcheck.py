@@ -314,7 +314,29 @@ class VMwareHealthCheck:
         tools = getattr(getattr(vm, 'guest', None), 'toolsStatus', 'unknown')
         power = getattr(getattr(vm, 'runtime', None), 'powerState', None)
         power = str(power) if power is not None else 'unknown'
-        return {'has_snapshot': has_snap, 'tools_status': tools, 'power_state': power}
+
+        disk_free_pct = None
+        try:
+            disks = getattr(getattr(vm, 'guest', None), 'disk', [])
+            if disks and not isinstance(disks, (list, tuple)):
+                disks = [disks]
+            free_values = []
+            for d in disks:
+                capacity = getattr(d, 'capacity', 0)
+                free = getattr(d, 'freeSpace', 0)
+                if capacity:
+                    free_values.append(free / capacity * 100)
+            if free_values:
+                disk_free_pct = round(min(free_values), 2)
+        except Exception:
+            disk_free_pct = None
+
+        return {
+            'has_snapshot': has_snap,
+            'tools_status': tools,
+            'power_state': power,
+            'disk_free_pct': disk_free_pct,
+        }
 
     def best_practice_check(self, host):
         """Comprueba parámetros recomendados en un host."""
@@ -530,13 +552,14 @@ class VMwareHealthCheck:
             if h.get('vms'):
                 html.append("<h3>VM Metrics</h3>")
                 html.append("<table>")
-                html.append("<tr><th>Name</th><th>CPU Ready (ms)</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th><th>Disk Reads (ops)</th><th>Disk Writes (ops)</th><th>Net RX (KB/s)</th><th>Net TX (KB/s)</th></tr>")
+                html.append("<tr><th>Name</th><th>CPU Ready (ms)</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th><th>Disk Free (%)</th><th>Disk Reads (ops)</th><th>Disk Writes (ops)</th><th>Net RX (KB/s)</th><th>Net TX (KB/s)</th></tr>")
                 for vm in h['vms']:
                     m = vm['metrics']
                     html.append(
                         f"<tr><td>{vm['name']}</td><td>{m.get('cpu_ready_ms', 0)}</td>"
                         f"<td>{round(m.get('cpu_usage_pct', 0) * 100, 2)}</td>"
                         f"<td>{round(m.get('mem_usage_pct', 0) * 100, 2)}</td>"
+                        f"<td>{m.get('disk_free_pct', 'n/a')}</td>"
                         f"<td>{m.get('disk_reads', 0)}</td>"
                         f"<td>{m.get('disk_writes', 0)}</td>"
                         f"<td>{m.get('net_rx_kbps', 0)}</td>"
@@ -656,15 +679,13 @@ class VMwareHealthCheck:
         datastores_list = [ds for h in hosts_data for ds in h.get('performance', {}).get('datastores', [])]
         datastores_sorted = sorted(datastores_list, key=lambda x: x.get('capacity_gb', 0), reverse=True)[:10]
 
-        host_disk_free = []
-        for h in hosts_data:
-            usage = [ds.get('usage_pct', 0) for ds in h.get('performance', {}).get('datastores', [])]
-            if usage:
-                free = 100 - sum(usage) / len(usage)
-            else:
-                free = 0
-            host_disk_free.append({'name': h.get('name'), 'free_pct': round(free, 2)})
-        top_disk_free = sorted(host_disk_free, key=lambda x: x['free_pct'])[:10]
+        vm_disk_free = []
+        for vm in running_vms:
+            free_pct = vm['metrics'].get('disk_free_pct')
+            if free_pct is not None:
+                vm_disk_free.append({'name': vm['name'], 'free_pct': free_pct})
+
+        top_disk_free = sorted(vm_disk_free, key=lambda x: x['free_pct'])[:10]
 
         top_iops = sorted(running_vms, key=lambda x: x['metrics'].get('iops', 0), reverse=True)[:10]
         top_network = sorted(running_vms, key=lambda x: x['metrics'].get('net_throughput_kbps', 0), reverse=True)[:10]
