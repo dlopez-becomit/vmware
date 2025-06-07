@@ -1,3 +1,4 @@
 pyvmomi
 matplotlib
 jinja2
+openai
