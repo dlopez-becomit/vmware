@@ -20,14 +20,16 @@ Este repositorio incluye una herramienta sencilla escrita en Python que se conec
    ```
 
    Si desea emplear una plantilla Jinja2 personalizada para el informe, coloque
-   el archivo `template.html` en el directorio deseado y utilice la opción
-   `--template` para indicar su ubicación:
+   el archivo de plantilla en el directorio deseado y utilice la opción
+   `--template` para indicar su ubicación. Puede indicar un nombre de plantilla
+   diferente mediante `--template-file`:
    ```bash
-   python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --output reporte.html --template /ruta/a/plantilla
+   python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --output reporte.html --template /ruta/a/plantilla --template-file template_a.html
    ```
    De forma predeterminada, `generate_report` buscará un archivo llamado
-   `template.html` en el mismo directorio del script. Este repositorio
-   incluye uno con un diseño minimalista y moderno listo para usar.
+   `template.html` en el directorio especificado (o en el del script si no se 
+   indica ninguno). Este repositorio incluye uno con un diseño minimalista y
+   moderno listo para usar.
 Adicionalmente, se proporciona "template_serviit.html" con un formato extendido y botones para exportar o imprimir el informe.
 
 El script mostrará por pantalla un resumen de la información recopilada para cada host y para cada máquina virtual encontrada.

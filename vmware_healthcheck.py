@@ -420,7 +420,7 @@ class VMwareHealthCheck:
         html.append("</div></body></html>")
         return '\n'.join(html)
 
-    def generate_report(self, hosts_data, vm_data, output_file, template_dir=None):
+    def generate_report(self, hosts_data, vm_data, output_file, template_dir=None, template_file='template.html'):
         """Crea un informe HTML con los datos obtenidos.
 
         Parameters
@@ -430,8 +430,10 @@ class VMwareHealthCheck:
         output_file : str
             Ruta del archivo HTML de salida.
         template_dir : str, optional
-            Directorio donde se encuentra ``template.html``. Si no se indica
+            Directorio donde se encuentra la plantilla HTML. Si no se indica
             se utilizará el directorio del script.
+        template_file : str, optional
+            Nombre del archivo de plantilla Jinja2. Por defecto ``template.html``.
         """
         logger.info("Generating HTML report: %s", output_file)
         chart = self._create_chart(hosts_data)
@@ -442,7 +444,7 @@ class VMwareHealthCheck:
         try:
             import jinja2
             env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
-            template = env.get_template('template.html')
+            template = env.get_template(template_file)
             html_content = template.render(hosts=hosts_data, vms=vm_data, chart=chart)
         except Exception as exc:
             logger.debug("Using default HTML template: %s", exc)
@@ -459,7 +461,9 @@ def main():
     parser.add_argument('--user', required=True, help='username')
     parser.add_argument('--password', required=True, help='password')
     parser.add_argument('--output', help='HTML report file')
-    parser.add_argument('--template', help='directory containing template.html')
+    parser.add_argument('--template', help='directory containing the template')
+    parser.add_argument('--template-file', default='template.html',
+                        help='name of the HTML template file')
     args = parser.parse_args()
 
     checker = VMwareHealthCheck(args.host, args.user, args.password)
@@ -509,7 +513,9 @@ def main():
             })
 
         if args.output:
-            checker.generate_report(hosts_data, all_vms, args.output, args.template)
+            checker.generate_report(
+                hosts_data, all_vms, args.output, args.template, args.template_file
+            )
             logger.info("HTML report written to %s", args.output)
     finally:
         checker.disconnect()
