@@ -3,11 +3,13 @@ import ssl
 import io
 import base64
 import logging
+import os
 from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from jinja2 import Environment, FileSystemLoader
 
 logging.basicConfig(
     level=logging.INFO,
@@ -236,61 +238,17 @@ class VMwareHealthCheck:
         logger.info("Generating HTML report: %s", output_file)
         chart = self._create_chart(hosts_data)
 
-        html = [
-            "<html><head><meta charset='utf-8'><title>VMware Health Check</title>",
-            "<style>body{font-family:Arial;}table{border-collapse:collapse;}",
-            "th,td{border:1px solid #ccc;padding:4px;}h1,h2{color:#2c3e50;}",
-            "</style></head><body>"
-        ]
-        html.append("<h1>VMware Health Check Report</h1>")
+        env = Environment(loader=FileSystemLoader(os.path.dirname(__file__)))
+        template = env.get_template('template.html')
 
-        html.append(f"<img src='data:image/png;base64,{chart}' alt='Resource Usage Chart'/>")
-
-        top_vms = sorted(vm_data, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
-        html.append("<h2>Top 10 VMs by CPU Ready</h2><table>")
-        html.append("<tr><th>VM</th><th>CPU Ready (ms)</th></tr>")
-        for v in top_vms:
-            html.append(f"<tr><td>{v['name']}</td><td>{v['metrics'].get('cpu_ready_ms', 0)}</td></tr>")
-        html.append("</table>")
-
-        for h in hosts_data:
-            html.append(f"<h2>Host: {h['name']}</h2>")
-            html.append("<h3>Security</h3><table>")
-            for k, v in h['security'].items():
-                html.append(f"<tr><th>{k}</th><td>{v}</td></tr>")
-            html.append("</table>")
-
-            html.append("<h3>Performance</h3><table>")
-            for k, v in h['performance'].items():
-                html.append(f"<tr><th>{k}</th><td>{v}</td></tr>")
-            html.append("</table>")
-
-            html.append("<h3>Best Practices</h3><table>")
-            for k, v in h['best_practice'].items():
-                html.append(f"<tr><th>{k}</th><td>{v}</td></tr>")
-            html.append("</table>")
-
-            if h.get('vms'):
-                html.append("<h3>VM Metrics</h3>")
-                html.append("<table>")
-                html.append("<tr><th>Name</th><th>CPU Ready (ms)</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th><th>Disk Reads</th><th>Disk Writes</th><th>Net RX</th><th>Net TX</th></tr>")
-                for vm in h['vms']:
-                    m = vm['metrics']
-                    html.append(
-                        f"<tr><td>{vm['name']}</td><td>{m.get('cpu_ready_ms', 0)}</td>"
-                        f"<td>{m.get('cpu_usage_pct', 0)}</td>"
-                        f"<td>{m.get('mem_usage_pct', 0)}</td>"
-                        f"<td>{m.get('disk_reads', 0)}</td>"
-                        f"<td>{m.get('disk_writes', 0)}</td>"
-                        f"<td>{m.get('net_rx_kbps', 0)}</td>"
-                        f"<td>{m.get('net_tx_kbps', 0)}</td></tr>"
-                    )
-                html.append("</table>")
-
-        html.append("</body></html>")
+        html_content = template.render({
+            'hosts_data': hosts_data,
+            'vm_data': vm_data,
+            'chart': chart,
+        })
 
         with open(output_file, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(html))
+            f.write(html_content)
 
 
 def main():

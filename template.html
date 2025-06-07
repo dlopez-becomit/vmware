@@ -1,0 +1,62 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>VMware Health Check</title>
+<style>
+body{font-family:Arial;}
+ table{border-collapse:collapse;}
+ th,td{border:1px solid #ccc;padding:4px;}
+ h1,h2{color:#2c3e50;}
+</style>
+</head>
+<body>
+<h1>VMware Health Check Report</h1>
+<img src="data:image/png;base64,{{ chart }}" alt="Resource Usage Chart"/>
+<h2>Top 10 VMs by CPU Ready</h2>
+<table>
+<tr><th>VM</th><th>CPU Ready (ms)</th></tr>
+{% for v in vm_data | sort(attribute='metrics.cpu_ready_ms', reverse=True)[:10] %}
+<tr><td>{{ v.name }}</td><td>{{ v.metrics.cpu_ready_ms }}</td></tr>
+{% endfor %}
+</table>
+{% for h in hosts_data %}
+<h2>Host: {{ h.name }}</h2>
+<h3>Security</h3>
+<table>
+{% for k, v in h.security.items() %}
+<tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+{% endfor %}
+</table>
+<h3>Performance</h3>
+<table>
+{% for k, v in h.performance.items() %}
+<tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+{% endfor %}
+</table>
+<h3>Best Practices</h3>
+<table>
+{% for k, v in h.best_practice.items() %}
+<tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+{% endfor %}
+</table>
+{% if h.vms %}
+<h3>VM Metrics</h3>
+<table>
+<tr><th>Name</th><th>CPU Ready (ms)</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th><th>Disk Reads</th><th>Disk Writes</th><th>Net RX</th><th>Net TX</th></tr>
+{% for vm in h.vms %}
+<tr>
+<td>{{ vm.name }}</td>
+<td>{{ vm.metrics.cpu_ready_ms }}</td>
+<td>{{ vm.metrics.cpu_usage_pct }}</td>
+<td>{{ vm.metrics.mem_usage_pct }}</td>
+<td>{{ vm.metrics.disk_reads }}</td>
+<td>{{ vm.metrics.disk_writes }}</td>
+<td>{{ vm.metrics.net_rx_kbps }}</td>
+<td>{{ vm.metrics.net_tx_kbps }}</td>
+</tr>
+{% endfor %}
+</table>
+{% endif %}
+{% endfor %}
+</body>
+</html>
