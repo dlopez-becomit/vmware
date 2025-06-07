@@ -56,6 +56,8 @@ class VMwareHealthCheckTests(unittest.TestCase):
         host.config = SimpleNamespace(
             lockdownMode='strict'
         )
+        # Minimal network config so performance and best practice checks work
+        host.config.network = SimpleNamespace(pnic=[])
         host.configManager = SimpleNamespace(
             serviceSystem=SimpleNamespace(
                 serviceInfo=SimpleNamespace(
@@ -76,9 +78,19 @@ class VMwareHealthCheckTests(unittest.TestCase):
         )
         host.hardware = SimpleNamespace(
             cpuPkg=[SimpleNamespace(description='Intel Xeon')],
-            memorySize=16 * 1024 ** 3
+            memorySize=16 * 1024 ** 3,
+            biosInfo=SimpleNamespace(biosVersion='1.0'),
+            systemInfo=SimpleNamespace(vendor='Dell', model='PowerEdge')
         )
-        host.datastore = [SimpleNamespace(info=SimpleNamespace(name='ds1'))]
+        host.datastore = [
+            SimpleNamespace(
+                summary=SimpleNamespace(
+                    name='ds1',
+                    capacity=100 * 1024 ** 3,
+                    freeSpace=50 * 1024 ** 3
+                )
+            )
+        ]
         host.network = [SimpleNamespace(name='nw1')]
         host.vm = [SimpleNamespace(name='vm1'), SimpleNamespace(name='vm2')]
         return host
@@ -107,8 +119,8 @@ class VMwareHealthCheckTests(unittest.TestCase):
         result = checker.best_practice_check(host)
         self.assertEqual(result['cpu_model'], 'Intel Xeon')
         self.assertEqual(result['memory_total_gb'], 16)
-        self.assertEqual(result['datastores'], ['ds1'])
-        self.assertEqual(result['network'], ['nw1'])
+        self.assertEqual(result['datastores'][0]['name'], 'ds1')
+        self.assertEqual(result['network'], [])
 
     def test_generate_report_creates_file(self):
         checker = VMwareHealthCheck('h', 'u', 'p')

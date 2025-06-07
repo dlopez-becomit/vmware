@@ -127,8 +127,41 @@ class VMwareHealthCheck:
         perf = {
             'cpu_usage': stats.overallCpuUsage,
             'memory_usage': stats.overallMemoryUsage,
-            'num_vms': len(getattr(host, 'vm', []))
+            'num_vms': len(getattr(host, 'vm', [])),
+            'network_usage_kbps': getattr(stats, 'overallNetworkUsage', 0)
         }
+
+        # Datastore usage aggregated across all datastores assigned to the host
+        datastore_stats = []
+        for ds in getattr(host, 'datastore', []):
+            try:
+                summary = ds.summary
+                datastore_stats.append({
+                    'name': summary.name,
+                    'capacity_gb': summary.capacity / (1024 ** 3),
+                    'free_gb': summary.freeSpace / (1024 ** 3)
+                })
+            except Exception:
+                continue
+        perf['datastores'] = datastore_stats
+
+        # Basic information about physical NICs
+        nic_stats = []
+        for pnic in getattr(host.config.network, 'pnic', []):
+            nic_stats.append({
+                'device': pnic.device,
+                'speed_mb': getattr(getattr(pnic, 'linkSpeed', None), 'speedMb', 'n/a')
+            })
+        perf['network'] = nic_stats
+
+        # Firmware information can also be interesting from a performance point of view
+        hw = host.hardware
+        perf['firmware'] = {
+            'bios_version': getattr(hw.biosInfo, 'biosVersion', 'n/a'),
+            'vendor': getattr(hw.systemInfo, 'vendor', 'n/a'),
+            'model': getattr(hw.systemInfo, 'model', 'n/a'),
+        }
+
         # Additional metrics can be gathered from host.configManager or perfManager
         return perf
 
@@ -141,21 +174,22 @@ class VMwareHealthCheck:
             counters[full] = c.key
         return counters
 
-    def vm_performance_check(self, vm, counters=None):
+    def vm_performance_check(self, vm, counters=None, metric_names=None):
         """Gather VM level performance metrics."""
         pm = self.si.content.perfManager
         if counters is None:
             counters = self._build_perf_counter_map()
 
-        metric_names = {
-            'cpu.ready.summation': 'cpu_ready_ms',
-            'cpu.usage.average': 'cpu_usage_pct',
-            'mem.usage.average': 'mem_usage_pct',
-            'disk.numberRead.summation': 'disk_reads',
-            'disk.numberWrite.summation': 'disk_writes',
-            'net.received.average': 'net_rx_kbps',
-            'net.transmitted.average': 'net_tx_kbps',
-        }
+        if metric_names is None:
+            metric_names = {
+                'cpu.ready.summation': 'cpu_ready_ms',
+                'cpu.usage.average': 'cpu_usage_pct',
+                'mem.usage.average': 'mem_usage_pct',
+                'disk.numberRead.summation': 'disk_reads',
+                'disk.numberWrite.summation': 'disk_writes',
+                'net.received.average': 'net_rx_kbps',
+                'net.transmitted.average': 'net_tx_kbps',
+            }
 
         metric_ids = []
         for key in metric_names:
@@ -171,14 +205,33 @@ class VMwareHealthCheck:
         )
 
         stats = pm.QueryStats(querySpec=[spec])
-        metrics = {v: 0 for v in metric_names.values()}
+        # Collect samples by metric field
+        samples = {v: [] for v in metric_names.values()}
         if stats:
             vals = stats[0].value
             for val in vals:
                 for name, field in metric_names.items():
-                    if counters.get(name) == val.id.counterId:
-                        if val.value:
-                            metrics[field] = sum(val.value) / len(val.value)
+                    if counters.get(name) == val.id.counterId and val.value:
+                        if name.endswith('summation') or name.startswith('disk') or name.startswith('net.'):
+                            # Sum across instances (e.g. multiple disks or NICs)
+                            if len(samples[field]) < len(val.value):
+                                samples[field] += [0] * (len(val.value) - len(samples[field]))
+                            for i, v in enumerate(val.value):
+                                samples[field][i] += v
+                        else:
+                            # Average type metrics - just store all values
+                            samples[field].extend(val.value)
+
+        metrics = {}
+        for name, field in metric_names.items():
+            values = samples.get(field, [])
+            if values:
+                metrics[field] = sum(values) / len(values)
+            else:
+                metrics[field] = 0
+
+        metrics['cpu_usage_pct'] /= 100.0
+        metrics['mem_usage_pct'] /= 100.0
         return metrics
 
     def best_practice_check(self, host):
@@ -189,8 +242,36 @@ class VMwareHealthCheck:
         bp['cpu_model'] = hardware.cpuPkg[0].description if hardware.cpuPkg else 'n/a'
         # Convert memory size from bytes to gigabytes for easier readability
         bp['memory_total_gb'] = hardware.memorySize / (1024 ** 3)
-        bp['datastores'] = [ds.info.name for ds in host.datastore]
-        bp['network'] = [nw.name for nw in host.network]
+
+        # Detailed datastore information
+        datastore_info = []
+        for ds in host.datastore:
+            try:
+                summary = ds.summary
+                datastore_info.append({
+                    'name': summary.name,
+                    'capacity_gb': summary.capacity / (1024 ** 3),
+                    'free_gb': summary.freeSpace / (1024 ** 3)
+                })
+            except Exception:
+                continue
+        bp['datastores'] = datastore_info
+
+        # Basic network interface details
+        nic_info = []
+        for pnic in getattr(host.config.network, 'pnic', []):
+            nic_info.append({
+                'device': pnic.device,
+                'speed_mb': getattr(getattr(pnic, 'linkSpeed', None), 'speedMb', 'n/a')
+            })
+        bp['network'] = nic_info
+
+        # Firmware information
+        bp['firmware'] = {
+            'bios_version': getattr(hardware.biosInfo, 'biosVersion', 'n/a'),
+            'vendor': getattr(hardware.systemInfo, 'vendor', 'n/a'),
+            'model': getattr(hardware.systemInfo, 'model', 'n/a'),
+        }
         return bp
 
     def _create_chart(self, hosts_data):
@@ -239,15 +320,15 @@ class VMwareHealthCheck:
         """
         logger.info("Generating HTML report: %s", output_file)
         chart = self._create_chart(hosts_data)
-
         env = Environment(loader=FileSystemLoader(os.path.dirname(__file__)))
-        template = env.get_template('template.html')
+        template = env.get_template("template.html")
 
         html_content = template.render({
-            'hosts_data': hosts_data,
-            'vm_data': vm_data,
-            'chart': chart,
+            "hosts_data": hosts_data,
+            "vm_data": vm_data,
+            "chart": chart,
         })
+
 
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
@@ -295,6 +376,8 @@ def main():
             for vm in vm_info:
                 print('  VM: {}'.format(vm['name']))
                 for mk, mv in vm['metrics'].items():
+                    if mk in ('cpu_usage_pct', 'mem_usage_pct'):
+                        mv = round(mv * 100, 2)
                     print('    {}: {}'.format(mk, mv))
             print()
 
