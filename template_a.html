@@ -365,7 +365,7 @@
             </thead>
             <tbody>
               {% for vm in top_iops %}
-              <tr><td>{{ vm.name }}</td><td>{{ vm.iops }}</td></tr>
+              <tr><td>{{ vm.name }}</td><td>{{ vm.metrics.iops }}</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -384,7 +384,7 @@
             </thead>
             <tbody>
               {% for sw in top_network %}
-              <tr><td>{{ sw.name }}</td><td>{{ sw.usage }}</td></tr>
+              <tr><td>{{ sw.name }}</td><td>{{ sw.metrics.net_throughput_kbps }}</td></tr>
               {% endfor %}
             </tbody>
           </table>
