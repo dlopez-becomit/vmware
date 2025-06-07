@@ -31,10 +31,11 @@ Este repositorio incluye una herramienta sencilla escrita en Python que se conec
    `--template` para indicar su ubicación. Puede indicar un nombre de plantilla
    diferente mediante `--template-file`:
    ```bash
-   python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --output reporte.html --template /ruta/a/plantilla --template-file template_a.html
-   ```
-   De forma predeterminada, `generate_report` buscará un archivo llamado `template.html` en el directorio especificado (o en el del script si no se indica ninguno). Este repositorio incluye uno con un diseño minimalista y
-   moderno listo para usar.
+python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --output reporte.html --template /ruta/a/plantilla --template-file template_a.html
+```
+De forma predeterminada, `generate_report` buscará un archivo llamado `template.html` en el directorio especificado (o en el del script si no se indica ninguno). Este repositorio incluye uno con un diseño minimalista y
+moderno listo para usar.
+Para obtener un informe de texto detallado mediante la API de OpenAI exporte `OPENAI_API_KEY` y añada la opción `--detailed-report <archivo>`. Si también se indica `--output`, el texto se incluirá al final del HTML.
 Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un formato extendido y botones para exportar o imprimir el informe. Para utilizarla basta con indicar el directorio donde se encuentra mediante `--template` y pasar `--template-file template_a.html`.
 
 Las comprobaciones se han ampliado para registrar el tiempo de actividad de cada host, detectar si el clúster tiene activados HA y DRS, y para cada VM revisar la presencia de instantáneas y el estado de VMware Tools.

@@ -9,6 +9,7 @@ from pyVmomi import vim
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from openai_report import generate_detailed_report
 
 logging.basicConfig(
     level=logging.INFO,
@@ -816,7 +817,28 @@ class VMwareHealthCheck:
             'chart': chart,
         }
 
-    def generate_report(self, hosts_data, vm_data, output_file, template_dir=None, template_file='template.html'):
+    def build_text_summary(self, hosts_data, summary):
+        """Build a plain text summary of the collected information."""
+        lines = []
+        lines.append("Resumen del entorno:")
+        for k, v in summary.items():
+            lines.append(f"- {k}: {v}")
+        for h in hosts_data:
+            lines.append("")
+            lines.append(f"Host {h.get('name')}")
+            lines.append("Seguridad:")
+            for k, v in h.get('security', {}).items():
+                lines.append(f"  {k}: {v}")
+            lines.append("Rendimiento:")
+            for k, v in h.get('performance', {}).items():
+                lines.append(f"  {k}: {v}")
+            lines.append("Buenas prácticas:")
+            for k, v in h.get('best_practice', {}).items():
+                lines.append(f"  {k}: {v}")
+        return "\n".join(lines)
+
+    def generate_report(self, hosts_data, vm_data, output_file, template_dir=None,
+                        template_file='template.html', detailed_report=None):
         """Crea un informe HTML con los datos obtenidos.
 
         Parameters
@@ -862,6 +884,13 @@ class VMwareHealthCheck:
                 logger.error("Error rendering template '%s': %s. Using default template", template_file, exc)
                 html_content = self._generate_report_default(hosts_data, vm_data, chart)
 
+        if detailed_report:
+            insert = f"<h2>Informe Detallado</h2><pre>{detailed_report}</pre>"
+            if '</body>' in html_content:
+                html_content = html_content.replace('</body>', insert + '</body>')
+            else:
+                html_content += insert
+
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
@@ -876,6 +905,9 @@ def main():
     parser.add_argument('--template', help='directory containing the template')
     parser.add_argument('--template-file', default='template.html',
                         help='name of the HTML template file')
+    parser.add_argument('--detailed-report', metavar='FILE',
+                        help='save an extended text report to FILE. If --output '
+                             'is given, the text will be embedded in the HTML')
     args = parser.parse_args()
 
     checker = VMwareHealthCheck(args.host, args.user, args.password)
@@ -974,12 +1006,30 @@ def main():
 
         print('Environment summary:', summary)
         print('Health scores:', scores, 'overall:', overall_score)
+        detailed_text = None
+        if args.detailed_report:
+            api_key = os.getenv('OPENAI_API_KEY')
+            model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+            if not api_key:
+                logger.error('OPENAI_API_KEY not set; skipping detailed report')
+            else:
+                try:
+                    summary_text = checker.build_text_summary(hosts_data, summary)
+                    detailed_text = generate_detailed_report(summary_text, api_key, model)
+                    if not args.output or args.detailed_report != args.output:
+                        with open(args.detailed_report, 'w', encoding='utf-8') as f:
+                            f.write(detailed_text)
+                except Exception as exc:  # pragma: no cover - external API
+                    logger.error('Failed to generate detailed report: %s', exc)
 
         if args.output:
             checker.generate_report(
-                hosts_data, all_vms, args.output, args.template, args.template_file
+                hosts_data, all_vms, args.output, args.template, args.template_file,
+                detailed_report=detailed_text
             )
             logger.info("HTML report written to %s", args.output)
+        elif detailed_text and args.detailed_report:
+            logger.info("Detailed report written to %s", args.detailed_report)
     finally:
         checker.disconnect()
 
