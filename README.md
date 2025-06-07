@@ -22,9 +22,14 @@ Este repositorio incluye una herramienta sencilla escrita en Python que se conec
    ```
 
 2. Ejecute el script proporcionando los datos de conexión. Puede especificar opcionalmente un archivo de salida HTML:
-   ```bash
-   python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --output reporte.html
-   ```
+```bash
+python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --output reporte.html
+```
+
+Para generar además un informe en texto (requiere haber definido `OPENAI_API_KEY`):
+```bash
+python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --detailed-report informe.txt
+```
 
    Si desea emplear una plantilla Jinja2 personalizada para el informe, coloque
    el archivo de plantilla en el directorio deseado y utilice la opción
@@ -35,7 +40,19 @@ python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password
 ```
 De forma predeterminada, `generate_report` buscará un archivo llamado `template.html` en el directorio especificado (o en el del script si no se indica ninguno). Este repositorio incluye uno con un diseño minimalista y
 moderno listo para usar.
-Para obtener un informe de texto detallado mediante la API de OpenAI exporte `OPENAI_API_KEY` y añada la opción `--detailed-report <archivo>`. Si también se indica `--output`, el texto se incluirá al final del HTML.
+Para obtener un informe de texto detallado mediante la API de OpenAI exporte `OPENAI_API_KEY` y añada la opción `--detailed-report <archivo>`.
+En sistemas Linux o macOS puede definirse así:
+```bash
+export OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+```
+Si utiliza Azure OpenAI establezca además las variables `OPENAI_API_TYPE=azure`, `OPENAI_API_BASE` y `OPENAI_API_VERSION` con los valores de su servicio.
+```bash
+export OPENAI_API_TYPE=azure
+export OPENAI_API_BASE=https://<tu-recurso>.openai.azure.com/
+export OPENAI_API_VERSION=2023-05-15
+export OPENAI_API_KEY=<clave>
+```
+Si también se indica `--output`, el texto se incluirá al final del HTML.
 Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un formato extendido y botones para exportar o imprimir el informe. Para utilizarla basta con indicar el directorio donde se encuentra mediante `--template` y pasar `--template-file template_a.html`.
 
 Las comprobaciones se han ampliado para registrar el tiempo de actividad de cada host, detectar si el clúster tiene activados HA y DRS, y para cada VM revisar la presencia de instantáneas y el estado de VMware Tools.
@@ -73,4 +90,14 @@ Si se desean añadir contadores de rendimiento adicionales por VM basta con prop
 - `disk_reads` y `disk_writes`: número medio de operaciones por intervalo.
 - `net_rx_kbps` y `net_tx_kbps`: velocidad media de recepción y envío en KB/s.
 - `disk_free_pct`: porcentaje de espacio libre en los discos virtuales de cada VM.
+
+### Prompt base
+
+La función `generate_detailed_report` utiliza un prompt muy sencillo para crear el informe:
+```python
+[
+    {"role": "system", "content": "Eres un experto en VMware. Debes redactar un informe profesional."},
+    {"role": "user", "content": "A partir del siguiente resumen genera un informe completo:\n<resumen>"}
+]
+```
 
