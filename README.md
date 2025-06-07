@@ -30,7 +30,11 @@ Este repositorio incluye una herramienta sencilla escrita en Python que se conec
    `template.html` en el directorio especificado (o en el del script si no se 
    indica ninguno). Este repositorio incluye uno con un diseño minimalista y
    moderno listo para usar.
-Adicionalmente, se proporciona "template_serviit.html" con un formato extendido y botones para exportar o imprimir el informe.
+Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un formato extendido y botones para exportar o imprimir el informe. Para utilizarla basta con indicar el directorio donde se encuentra mediante `--template` y pasar `--template-file template_a.html`.
+
+Las comprobaciones se han ampliado para registrar el tiempo de actividad de cada host, detectar si el clúster tiene activados HA y DRS, y para cada VM revisar la presencia de instantáneas y el estado de VMware Tools.
+
+El informe generado con `template_a.html` muestra nuevas secciones: un **Health Score** con métricas globales, un resumen por categorías (rendimiento, almacenamiento, seguridad y disponibilidad), indicadores de componentes clave y varias tablas con los 10 elementos más relevantes (CPU Ready, uso de RAM, capacidad de datastores, IOPS y tráfico de red).
 
 El script mostrará por pantalla un resumen de la información recopilada para cada host y para cada máquina virtual encontrada.
 El informe HTML incluye ahora un ranking con las 10 máquinas virtuales con mayor **CPU Ready** y tablas con métricas detalladas de CPU, memoria, disco y red por VM. Además, se recopila información de datastores, interfaces de red y firmware de cada host.
