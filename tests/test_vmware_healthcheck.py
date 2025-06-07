@@ -70,6 +70,13 @@ class VMwareHealthCheckTests(unittest.TestCase):
         host.vm = [SimpleNamespace(name='vm1'), SimpleNamespace(name='vm2')]
         return host
 
+    def _fake_vm(self):
+        vm = SimpleNamespace()
+        vm.name = 'vmx'
+        vm.snapshot = object()
+        vm.guest = SimpleNamespace(toolsStatus='toolsOk')
+        return vm
+
     def test_security_check(self):
         checker = VMwareHealthCheck('h', 'u', 'p')
         host = self._fake_host()
@@ -96,6 +103,20 @@ class VMwareHealthCheckTests(unittest.TestCase):
         self.assertEqual(result['memory_total_gb'], 16)
         self.assertEqual(result['datastores'], ['ds1'])
         self.assertEqual(result['network'], ['nw1'])
+
+    def test_runtime_info(self):
+        checker = VMwareHealthCheck('h', 'u', 'p')
+        host = self._fake_host()
+        host.runtime = SimpleNamespace(bootTime=None)
+        info = checker.host_runtime_info(host)
+        self.assertIn('uptime_seconds', info)
+
+    def test_vm_extra_info(self):
+        checker = VMwareHealthCheck('h', 'u', 'p')
+        vm = self._fake_vm()
+        info = checker.vm_extra_info(vm)
+        self.assertTrue(info['has_snapshot'])
+        self.assertEqual(info['tools_status'], 'toolsOk')
 
     def test_generate_report_creates_file(self):
         checker = VMwareHealthCheck('h', 'u', 'p')
