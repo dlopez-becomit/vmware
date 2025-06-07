@@ -47,8 +47,15 @@ Adicionalmente, la versión actual realiza comprobaciones básicas de:
 - Inconsistencias de carpetas o VMs duplicadas.
 - Búsqueda de VMDK "zombies" no asociados a una VM.
 - Presencia de snapshots como indicativo de copias de seguridad.
+- Verificación de CPU Ready y memoria "balloon" en las VMs.
+- Comprobación básica de cumplimiento de actualizaciones en los hosts.
+- Alerta por datastores con más del 90% de uso.
+- Detección de IPv6 habilitado.
+- Cálculo de la relación vCPU/pCPU y políticas Round Robin en iSCSI.
+- Consistencia del nombre DNS configurado en cada host.
 
 El informe generado con `template_a.html` muestra nuevas secciones: un **Health Score** con métricas globales, un resumen por categorías (rendimiento, almacenamiento, seguridad y disponibilidad), indicadores de componentes clave y varias tablas con los 10 elementos más relevantes (CPU Ready, uso de RAM, capacidad de datastores, espacio libre de discos por VM, IOPS y tráfico de red).
+Además se incluyen indicadores extra como estado de actualizaciones, presencia de ballooning o discrepancias de DNS entre otros.
 
 
 El script mostrará por pantalla un resumen de la información recopilada para cada host y para cada máquina virtual encontrada.

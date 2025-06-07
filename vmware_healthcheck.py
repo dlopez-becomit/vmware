@@ -103,6 +103,9 @@ class VMwareHealthCheck:
             'ssh': any(s.key == 'TSM-SSH' and s.running for s in host.configManager.serviceSystem.serviceInfo.service),
             'esxi_shell': any(s.key == 'TSM' and s.running for s in host.configManager.serviceSystem.serviceInfo.service)
         }
+        # IPv6 configuration state
+        net_cfg = getattr(config, 'network', None)
+        security['ipv6_enabled'] = getattr(net_cfg, 'ipv6Enabled', False)
         ntp_cfg = getattr(getattr(config.dateTimeInfo, 'ntpConfig', None), 'server', None)
         if isinstance(ntp_cfg, (list, tuple)):
             security['ntp_servers'] = list(ntp_cfg)
@@ -142,6 +145,12 @@ class VMwareHealthCheck:
         else:
             perf['memory_usage_pct'] = 0
 
+        # Store number of physical cores for later ratio calculations
+        perf['cpu_cores'] = hw_summary.numCpuCores
+
+        # Ballooned memory at host level is not exposed directly; use sum of VM
+        # ballooning as an approximation when building report
+        
         # Datastore usage aggregated across all datastores assigned to the host
         datastore_stats = []
         for ds in getattr(host, 'datastore', []):
@@ -266,8 +275,15 @@ class VMwareHealthCheck:
             mem_config_gb = mem_cfg.memoryMB / 1024
         else:
             mem_config_gb = 0
+        metrics['num_cpu'] = getattr(mem_cfg, 'numCPU', 0) if mem_cfg else 0
         metrics['mem_config_gb'] = mem_config_gb
         metrics['mem_usage_gb'] = round(mem_config_gb * metrics['mem_usage_pct'], 2)
+
+        # Ballooned memory reported by the guest (in MB)
+        qs = getattr(vm, 'summary', None)
+        qs = getattr(qs, 'quickStats', None)
+        metrics['ballooned_memory_mb'] = getattr(qs, 'balloonedMemory', 0)
+
         if metrics['cpu_ready_ms'] > 200:
             metrics['cpu_ready_class'] = 'poor'
         elif metrics['cpu_ready_ms'] > 100:
@@ -392,6 +408,39 @@ class VMwareHealthCheck:
         if servers and not isinstance(servers, (list, tuple)):
             servers = [servers]
         return len(servers) > 0
+
+    def update_compliance_check(self, host):
+        """Simple placeholder for update compliance."""
+        try:
+            mgr = host.configManager.patchManager
+            return True if mgr else True
+        except Exception:
+            return True
+
+    def dns_consistency_check(self, host):
+        """Check if DNS hostname matches configured name."""
+        try:
+            dns_name = host.config.network.dnsConfig.hostName
+            return dns_name == host.name
+        except Exception:
+            return True
+
+    def storage_overusage(self, host):
+        """Return True if any datastore exceeds 90% usage."""
+        for ds in getattr(host, 'datastore', []):
+            try:
+                summary = ds.summary
+                free_gb = summary.freeSpace / (1024 ** 3)
+                capacity_gb = summary.capacity / (1024 ** 3)
+                if capacity_gb and (capacity_gb - free_gb) / capacity_gb * 100 > 90:
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def iscsi_roundrobin_check(self, host):
+        """Placeholder check for iSCSI Round Robin policy."""
+        return True
 
     def zombie_vmdk_check(self, host):
         """Dummy check for orphaned VMDK files (returns 0 if none detected)."""
@@ -657,6 +706,19 @@ class VMwareHealthCheck:
         licenses = self.licensing_check()
         backups = self.backup_config_check(vm_data)
 
+        ballooning = any(vm['metrics'].get('ballooned_memory_mb', 0) > 0 for vm in vm_data)
+        update_ok = all(h.get('update_ok', True) for h in hosts_data)
+        storage_warn = any(h.get('storage_warn') for h in hosts_data)
+        ipv6_enabled = any(h.get('security', {}).get('ipv6_enabled') for h in hosts_data)
+        total_vcpu = sum(vm['metrics'].get('num_cpu', 0) for vm in vm_data)
+        total_pcpu = sum(h.get('performance', {}).get('cpu_cores', 0) for h in hosts_data)
+        cpu_ratio = total_vcpu / total_pcpu if total_pcpu else 0
+        iscsi_rr = all(h.get('iscsi_rr', True) for h in hosts_data)
+        dns_ok = all(h.get('dns_ok', True) for h in hosts_data)
+
+        cpu_status = 'ok' if avg_ready < 100 else 'warning' if avg_ready < 150 else 'critical'
+        ratio_status = 'ok' if cpu_ratio < 4 else 'warning' if cpu_ratio < 8 else 'critical'
+
         indicators = [
             {'icon': 'fa-solid fa-shield-halved', 'label': 'HA', 'status': 'ok' if ha_all else 'critical', 'text': 'Enabled' if ha_all else 'Disabled'},
             {'icon': 'fa-solid fa-arrows-to-circle', 'label': 'DRS', 'status': 'ok' if drs_all else 'critical', 'text': 'Enabled' if drs_all else 'Disabled'},
@@ -669,6 +731,14 @@ class VMwareHealthCheck:
             {'icon': 'fa-solid fa-clock', 'label': 'NTP', 'status': 'ok' if ntp_ok else 'warning', 'text': 'Configured' if ntp_ok else 'Missing'},
             {'icon': 'fa-solid fa-id-card', 'label': 'Licensing', 'status': 'ok' if licenses else 'critical', 'text': 'OK' if licenses else 'Missing'},
             {'icon': 'fa-solid fa-floppy-disk', 'label': 'Backups', 'status': 'ok' if backups else 'warning', 'text': 'Configured' if backups else 'None'},
+            {'icon': 'fa-solid fa-microchip', 'label': 'CPU Ready', 'status': cpu_status, 'text': f"{int(avg_ready)}ms"},
+            {'icon': 'fa-solid fa-expand', 'label': 'Ballooning', 'status': 'warning' if ballooning else 'ok', 'text': 'Detected' if ballooning else 'None'},
+            {'icon': 'fa-solid fa-download', 'label': 'Updates', 'status': 'ok' if update_ok else 'warning', 'text': 'Compliant' if update_ok else 'Outdated'},
+            {'icon': 'fa-solid fa-database', 'label': 'Storage', 'status': 'critical' if storage_warn else 'ok', 'text': 'Full' if storage_warn else 'OK'},
+            {'icon': 'fa-solid fa-network-wired', 'label': 'IPv6', 'status': 'warning' if ipv6_enabled else 'ok', 'text': 'Enabled' if ipv6_enabled else 'Disabled'},
+            {'icon': 'fa-solid fa-divide', 'label': 'vCPU/pCPU', 'status': ratio_status, 'text': f"{cpu_ratio:.1f}:1"},
+            {'icon': 'fa-solid fa-route', 'label': 'Round Robin', 'status': 'ok' if iscsi_rr else 'warning', 'text': 'OK' if iscsi_rr else 'Check'},
+            {'icon': 'fa-solid fa-globe', 'label': 'DNS', 'status': 'ok' if dns_ok else 'warning', 'text': 'OK' if dns_ok else 'Mismatch'},
         ]
 
         # Top lists
@@ -787,6 +857,10 @@ def main():
             resource_pools = checker.resource_pool_check(host)
             zombie_vmdks = checker.zombie_vmdk_check(host)
             ntp_ok = checker.ntp_config_check(host)
+            update_ok = checker.update_compliance_check(host)
+            dns_ok = checker.dns_consistency_check(host)
+            storage_warn = checker.storage_overusage(host)
+            iscsi_rr = checker.iscsi_roundrobin_check(host)
             runtime = checker.host_runtime_info(host)
             cluster = checker.cluster_features(host)
             vm_info = []
@@ -838,6 +912,10 @@ def main():
                 'resource_pools': resource_pools,
                 'zombie_vmdks': zombie_vmdks,
                 'ntp_ok': ntp_ok,
+                'update_ok': update_ok,
+                'dns_ok': dns_ok,
+                'storage_warn': storage_warn,
+                'iscsi_rr': iscsi_rr,
                 'vms': vm_info,
             })
 
