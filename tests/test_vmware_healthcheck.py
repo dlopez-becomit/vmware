@@ -118,5 +118,26 @@ class VMwareHealthCheckTests(unittest.TestCase):
                 content = f.read()
             self.assertIn('VMware Health Check Report', content)
 
+    def test_report_handles_string_datastores(self):
+        checker = VMwareHealthCheck('h', 'u', 'p')
+        hosts_data = [{
+            'name': 'host1',
+            'security': {},
+            'performance': {
+                'cpu_usage': 10,
+                'memory_usage': 20,
+                'datastores': [{'name': 'ds1', 'capacity_gb': 1, 'free_gb': 0.5}]
+            },
+            'best_practice': {
+                'cpu_model': 'model',
+                'memory_total_gb': 16,
+                'datastores': ['ds1']
+            },
+            'vms': []
+        }]
+        with mock.patch.object(checker, '_create_chart', return_value='img'):
+            html = checker._generate_report_default(hosts_data, [], 'img')
+        self.assertIn('ds1', html)
+
 if __name__ == '__main__':
     unittest.main()
