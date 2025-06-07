@@ -821,16 +821,24 @@ class VMwareHealthCheck:
 
         try:
             import jinja2
-            env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
-            template = env.get_template(template_file)
-            if template_file == 'template_a.html':
-                data = self._build_report_data(hosts_data, vm_data, chart)
-                html_content = template.render(**data)
-            else:
-                html_content = template.render(hosts=hosts_data, vms=vm_data, chart=chart)
-        except Exception as exc:
-            logger.debug("Using default HTML template: %s", exc)
+        except Exception as exc:  # pragma: no cover - optional dependency
+            logger.error("Jinja2 not available: %s. Using default template", exc)
             html_content = self._generate_report_default(hosts_data, vm_data, chart)
+        else:
+            try:
+                env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
+                template = env.get_template(template_file)
+                if template_file == 'template_a.html':
+                    data = self._build_report_data(hosts_data, vm_data, chart)
+                    html_content = template.render(**data)
+                else:
+                    html_content = template.render(hosts=hosts_data, vms=vm_data, chart=chart)
+            except jinja2.TemplateNotFound as exc:
+                logger.error("Template '%s' not found in '%s': %s. Using default template", template_file, template_dir, exc)
+                html_content = self._generate_report_default(hosts_data, vm_data, chart)
+            except Exception as exc:  # pragma: no cover - rendering errors
+                logger.error("Error rendering template '%s': %s. Using default template", template_file, exc)
+                html_content = self._generate_report_default(hosts_data, vm_data, chart)
 
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
