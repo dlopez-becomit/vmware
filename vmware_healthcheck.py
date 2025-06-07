@@ -203,14 +203,33 @@ class VMwareHealthCheck:
         )
 
         stats = pm.QueryStats(querySpec=[spec])
-        metrics = {v: 0 for v in metric_names.values()}
+        # Collect samples by metric field
+        samples = {v: [] for v in metric_names.values()}
         if stats:
             vals = stats[0].value
             for val in vals:
                 for name, field in metric_names.items():
-                    if counters.get(name) == val.id.counterId:
-                        if val.value:
-                            metrics[field] = sum(val.value) / len(val.value)
+                    if counters.get(name) == val.id.counterId and val.value:
+                        if name.endswith('summation') or name.startswith('disk') or name.startswith('net.'):
+                            # Sum across instances (e.g. multiple disks or NICs)
+                            if len(samples[field]) < len(val.value):
+                                samples[field] += [0] * (len(val.value) - len(samples[field]))
+                            for i, v in enumerate(val.value):
+                                samples[field][i] += v
+                        else:
+                            # Average type metrics - just store all values
+                            samples[field].extend(val.value)
+
+        metrics = {}
+        for name, field in metric_names.items():
+            values = samples.get(field, [])
+            if values:
+                metrics[field] = sum(values) / len(values)
+            else:
+                metrics[field] = 0
+
+        metrics['cpu_usage_pct'] /= 100.0
+        metrics['mem_usage_pct'] /= 100.0
         return metrics
 
     def best_practice_check(self, host):
@@ -371,13 +390,13 @@ class VMwareHealthCheck:
             if h.get('vms'):
                 html.append("<h3>VM Metrics</h3>")
                 html.append("<table>")
-                html.append("<tr><th>Name</th><th>CPU Ready (ms)</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th><th>Disk Reads</th><th>Disk Writes</th><th>Net RX</th><th>Net TX</th></tr>")
+                html.append("<tr><th>Name</th><th>CPU Ready (ms)</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th><th>Disk Reads (ops)</th><th>Disk Writes (ops)</th><th>Net RX (KB/s)</th><th>Net TX (KB/s)</th></tr>")
                 for vm in h['vms']:
                     m = vm['metrics']
                     html.append(
                         f"<tr><td>{vm['name']}</td><td>{m.get('cpu_ready_ms', 0)}</td>"
-                        f"<td>{m.get('cpu_usage_pct', 0)}</td>"
-                        f"<td>{m.get('mem_usage_pct', 0)}</td>"
+                        f"<td>{round(m.get('cpu_usage_pct', 0) * 100, 2)}</td>"
+                        f"<td>{round(m.get('mem_usage_pct', 0) * 100, 2)}</td>"
                         f"<td>{m.get('disk_reads', 0)}</td>"
                         f"<td>{m.get('disk_writes', 0)}</td>"
                         f"<td>{m.get('net_rx_kbps', 0)}</td>"
@@ -433,6 +452,8 @@ def main():
             for vm in vm_info:
                 print('  VM: {}'.format(vm['name']))
                 for mk, mv in vm['metrics'].items():
+                    if mk in ('cpu_usage_pct', 'mem_usage_pct'):
+                        mv = round(mv * 100, 2)
                     print('    {}: {}'.format(mk, mv))
             print()
 
