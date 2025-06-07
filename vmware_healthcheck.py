@@ -263,7 +263,12 @@ class VMwareHealthCheck:
         runtime = getattr(host, 'runtime', None)
         boot = getattr(runtime, 'bootTime', None)
         if boot:
-            uptime = (datetime.datetime.utcnow() - boot).total_seconds()
+            # Ensure both datetimes are either aware or naive before subtraction
+            if boot.tzinfo is not None:
+                now = datetime.datetime.now(tz=boot.tzinfo)
+            else:
+                now = datetime.datetime.utcnow()
+            uptime = (now - boot).total_seconds()
         else:
             uptime = 0
         return {
