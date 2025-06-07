@@ -19,6 +19,15 @@ Este repositorio incluye una herramienta sencilla escrita en Python que se conec
    python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --output reporte.html
    ```
 
+   Si desea emplear una plantilla Jinja2 personalizada para el informe, coloque
+   el archivo `template.html` en el directorio deseado y utilice la opción
+   `--template` para indicar su ubicación:
+   ```bash
+   python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --output reporte.html --template /ruta/a/plantilla
+   ```
+   De forma predeterminada, `generate_report` buscará un archivo llamado
+   `template.html` en el mismo directorio del script.
+
 El script mostrará por pantalla un resumen de la información recopilada para cada host y para cada máquina virtual encontrada.
 El informe HTML incluye ahora un ranking con las 10 máquinas virtuales con mayor **CPU Ready** y tablas con métricas detalladas de CPU, memoria, disco y red por VM. Además, se recopila información de datastores, interfaces de red y firmware de cada host.
 
