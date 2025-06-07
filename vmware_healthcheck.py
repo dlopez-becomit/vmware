@@ -349,7 +349,15 @@ class VMwareHealthCheck:
                 html.append("<h4>Datastores</h4>")
                 html.append("<table><tr><th>Name</th><th>Capacity (GB)</th><th>Free (GB)</th></tr>")
                 for ds in h['performance']['datastores']:
-                    html.append(f"<tr><td>{ds['name']}</td><td>{ds['capacity_gb']:.1f}</td><td>{ds['free_gb']:.1f}</td></tr>")
+                    if isinstance(ds, dict):
+                        name = ds.get('name', 'n/a')
+                        cap = f"{ds.get('capacity_gb', 0):.1f}"
+                        free = f"{ds.get('free_gb', 0):.1f}"
+                    else:
+                        name = str(ds)
+                        cap = 'n/a'
+                        free = 'n/a'
+                    html.append(f"<tr><td>{name}</td><td>{cap}</td><td>{free}</td></tr>")
                 html.append("</table>")
 
             if h['performance'].get('network'):
@@ -367,7 +375,15 @@ class VMwareHealthCheck:
             if h['best_practice'].get('datastores'):
                 html.append("<h4>Datastores</h4><table><tr><th>Name</th><th>Capacity (GB)</th><th>Free (GB)</th></tr>")
                 for ds in h['best_practice']['datastores']:
-                    html.append(f"<tr><td>{ds['name']}</td><td>{ds['capacity_gb']:.1f}</td><td>{ds['free_gb']:.1f}</td></tr>")
+                    if isinstance(ds, dict):
+                        name = ds.get('name', 'n/a')
+                        cap = f"{ds.get('capacity_gb', 0):.1f}"
+                        free = f"{ds.get('free_gb', 0):.1f}"
+                    else:
+                        name = str(ds)
+                        cap = 'n/a'
+                        free = 'n/a'
+                    html.append(f"<tr><td>{name}</td><td>{cap}</td><td>{free}</td></tr>")
                 html.append("</table>")
 
             if h['best_practice'].get('network'):
