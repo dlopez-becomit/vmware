@@ -130,6 +130,55 @@ class VMwareHealthCheck:
         # Additional metrics can be gathered from host.configManager or perfManager
         return perf
 
+    def _build_perf_counter_map(self):
+        """Create a mapping of performance counter name to counter id."""
+        pm = self.si.content.perfManager
+        counters = {}
+        for c in pm.perfCounter:
+            full = f"{c.groupInfo.key}.{c.nameInfo.key}.{c.rollupType}"
+            counters[full] = c.key
+        return counters
+
+    def vm_performance_check(self, vm, counters=None):
+        """Gather VM level performance metrics."""
+        pm = self.si.content.perfManager
+        if counters is None:
+            counters = self._build_perf_counter_map()
+
+        metric_names = {
+            'cpu.ready.summation': 'cpu_ready_ms',
+            'cpu.usage.average': 'cpu_usage_pct',
+            'mem.usage.average': 'mem_usage_pct',
+            'disk.numberRead.summation': 'disk_reads',
+            'disk.numberWrite.summation': 'disk_writes',
+            'net.received.average': 'net_rx_kbps',
+            'net.transmitted.average': 'net_tx_kbps',
+        }
+
+        metric_ids = []
+        for key in metric_names:
+            cid = counters.get(key)
+            if cid:
+                metric_ids.append(vim.PerformanceManager.MetricId(counterId=cid, instance="*"))
+
+        spec = vim.PerformanceManager.QuerySpec(
+            entity=vm,
+            maxSample=1,
+            metricId=metric_ids,
+            intervalId=20,
+        )
+
+        stats = pm.QueryStats(querySpec=[spec])
+        metrics = {v: 0 for v in metric_names.values()}
+        if stats:
+            vals = stats[0].value
+            for val in vals:
+                for name, field in metric_names.items():
+                    if counters.get(name) == val.id.counterId:
+                        if val.value:
+                            metrics[field] = sum(val.value) / len(val.value)
+        return metrics
+
     def best_practice_check(self, host):
         """Comprueba parámetros recomendados en un host."""
         logger.info("Checking best practices on %s", host.name)
@@ -174,7 +223,7 @@ class VMwareHealthCheck:
         encoded = base64.b64encode(buffer.getvalue()).decode()
         return encoded
 
-    def generate_report(self, hosts_data, output_file):
+    def generate_report(self, hosts_data, vm_data, output_file):
         """Crea un informe HTML con los datos obtenidos.
 
         Parameters
@@ -197,6 +246,13 @@ class VMwareHealthCheck:
 
         html.append(f"<img src='data:image/png;base64,{chart}' alt='Resource Usage Chart'/>")
 
+        top_vms = sorted(vm_data, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
+        html.append("<h2>Top 10 VMs by CPU Ready</h2><table>")
+        html.append("<tr><th>VM</th><th>CPU Ready (ms)</th></tr>")
+        for v in top_vms:
+            html.append(f"<tr><td>{v['name']}</td><td>{v['metrics'].get('cpu_ready_ms', 0)}</td></tr>")
+        html.append("</table>")
+
         for h in hosts_data:
             html.append(f"<h2>Host: {h['name']}</h2>")
             html.append("<h3>Security</h3><table>")
@@ -213,6 +269,23 @@ class VMwareHealthCheck:
             for k, v in h['best_practice'].items():
                 html.append(f"<tr><th>{k}</th><td>{v}</td></tr>")
             html.append("</table>")
+
+            if h.get('vms'):
+                html.append("<h3>VM Metrics</h3>")
+                html.append("<table>")
+                html.append("<tr><th>Name</th><th>CPU Ready (ms)</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th><th>Disk Reads</th><th>Disk Writes</th><th>Net RX</th><th>Net TX</th></tr>")
+                for vm in h['vms']:
+                    m = vm['metrics']
+                    html.append(
+                        f"<tr><td>{vm['name']}</td><td>{m.get('cpu_ready_ms', 0)}</td>"
+                        f"<td>{m.get('cpu_usage_pct', 0)}</td>"
+                        f"<td>{m.get('mem_usage_pct', 0)}</td>"
+                        f"<td>{m.get('disk_reads', 0)}</td>"
+                        f"<td>{m.get('disk_writes', 0)}</td>"
+                        f"<td>{m.get('net_rx_kbps', 0)}</td>"
+                        f"<td>{m.get('net_tx_kbps', 0)}</td></tr>"
+                    )
+                html.append("</table>")
 
         html.append("</body></html>")
 
@@ -235,11 +308,18 @@ def main():
 
         hosts = checker.get_hosts()
         hosts_data = []
+        all_vms = []
         for host in hosts:
             logger.info("Processing host %s", host.name)
             security = checker.security_check(host)
             performance = checker.performance_check(host)
             best_practice = checker.best_practice_check(host)
+            vm_info = []
+            counters = checker._build_perf_counter_map()
+            for vm in getattr(host, 'vm', []):
+                metrics = checker.vm_performance_check(vm, counters)
+                vm_info.append({'name': vm.name, 'metrics': metrics})
+                all_vms.append({'name': vm.name, 'metrics': metrics})
 
             print('--- Host: {} ---'.format(host.name))
             print('Security:')
@@ -251,17 +331,23 @@ def main():
             print('Best Practices:')
             for k, v in best_practice.items():
                 print('  {}: {}'.format(k, v))
+            print('VM Metrics:')
+            for vm in vm_info:
+                print('  VM: {}'.format(vm['name']))
+                for mk, mv in vm['metrics'].items():
+                    print('    {}: {}'.format(mk, mv))
             print()
 
             hosts_data.append({
                 'name': host.name,
                 'security': security,
                 'performance': performance,
-                'best_practice': best_practice
+                'best_practice': best_practice,
+                'vms': vm_info,
             })
 
         if args.output:
-            checker.generate_report(hosts_data, args.output)
+            checker.generate_report(hosts_data, all_vms, args.output)
             logger.info("HTML report written to %s", args.output)
     finally:
         checker.disconnect()
