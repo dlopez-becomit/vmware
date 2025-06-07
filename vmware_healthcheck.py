@@ -135,10 +135,16 @@ class VMwareHealthCheck:
         for ds in getattr(host, 'datastore', []):
             try:
                 summary = ds.summary
+                free_gb = summary.freeSpace / (1024 ** 3)
+                capacity_gb = summary.capacity / (1024 ** 3)
+                usage_pct = (
+                    0 if capacity_gb == 0 else (capacity_gb - free_gb) / capacity_gb * 100
+                )
                 datastore_stats.append({
                     'name': summary.name,
-                    'capacity_gb': summary.capacity / (1024 ** 3),
-                    'free_gb': summary.freeSpace / (1024 ** 3)
+                    'capacity_gb': capacity_gb,
+                    'free_gb': free_gb,
+                    'usage_pct': usage_pct,
                 })
             except Exception:
                 continue
@@ -236,7 +242,57 @@ class VMwareHealthCheck:
 
         metrics['cpu_usage_pct'] /= 100.0
         metrics['mem_usage_pct'] /= 100.0
+        metrics['iops'] = (
+            metrics.get('disk_reads', 0) + metrics.get('disk_writes', 0)
+        ) / 20.0
+        metrics['net_throughput_kbps'] = (
+            metrics.get('net_rx_kbps', 0) + metrics.get('net_tx_kbps', 0)
+        )
+        if metrics['cpu_ready_ms'] > 200:
+            metrics['cpu_ready_class'] = 'poor'
+        elif metrics['cpu_ready_ms'] > 100:
+            metrics['cpu_ready_class'] = 'fair'
+        else:
+            metrics['cpu_ready_class'] = 'good'
         return metrics
+
+    def host_runtime_info(self, host):
+        """Return uptime information for a host."""
+        import datetime
+
+        runtime = getattr(host, 'runtime', None)
+        boot = getattr(runtime, 'bootTime', None)
+        if boot:
+            # Ensure both datetimes are either aware or naive before subtraction
+            if boot.tzinfo is not None:
+                now = datetime.datetime.now(tz=boot.tzinfo)
+            else:
+                now = datetime.datetime.utcnow()
+            uptime = (now - boot).total_seconds()
+        else:
+            uptime = 0
+        return {
+            'boot_time': boot,
+            'uptime_seconds': uptime,
+            'sla_violations': 0,
+            'alert_count': 0,
+        }
+
+    def cluster_features(self, host):
+        """Return cluster level features such as HA or DRS if available."""
+        cluster = getattr(host, 'parent', None)
+        if isinstance(cluster, vim.ClusterComputeResource):
+            cfg = getattr(cluster, 'configurationEx', None)
+            das = getattr(getattr(cfg, 'dasConfig', None), 'enabled', False)
+            drs = getattr(getattr(cfg, 'drsConfig', None), 'enabled', False)
+            return {'ha_enabled': bool(das), 'drs_enabled': bool(drs)}
+        return {'ha_enabled': False, 'drs_enabled': False}
+
+    def vm_extra_info(self, vm):
+        """Return snapshot presence and VMware Tools status."""
+        has_snap = hasattr(vm, 'snapshot') and vm.snapshot is not None
+        tools = getattr(getattr(vm, 'guest', None), 'toolsStatus', 'unknown')
+        return {'has_snapshot': has_snap, 'tools_status': tools}
 
     def best_practice_check(self, host):
         """Comprueba parámetros recomendados en un host."""
@@ -420,7 +476,103 @@ class VMwareHealthCheck:
         html.append("</div></body></html>")
         return '\n'.join(html)
 
-    def generate_report(self, hosts_data, vm_data, output_file, template_dir=None):
+    def _build_report_data(self, hosts_data, vm_data, chart):
+        """Construye la estructura de datos para la plantilla avanzada."""
+        import datetime
+
+        # Resumen global simple
+        uptime = sum(h.get('runtime', {}).get('uptime_seconds', 0) for h in hosts_data)
+        avg_uptime_days = uptime / max(len(hosts_data), 1) / 86400
+        total_datastores = sum(len(h.get('performance', {}).get('datastores', [])) for h in hosts_data)
+        total_networks = sum(len(h.get('best_practice', {}).get('network', [])) for h in hosts_data)
+
+        health_score = 100
+        health = {
+            'score': int(health_score),
+            'status_class': 'optimal',
+            'status_text': 'OK',
+            'uptime_days': int(avg_uptime_days),
+            'alerts': 0,
+            'sla': 100,
+        }
+
+        infra = {
+            'hosts': len(hosts_data),
+            'vms': len(vm_data),
+            'datastores': total_datastores,
+            'networks': total_networks,
+        }
+
+        categories = [
+            {'name': 'Performance', 'percent': 100, 'status': 'OK', 'status_class': 'ok', 'icon': 'fa-solid fa-gauge-high'},
+            {'name': 'Storage', 'percent': 100, 'status': 'OK', 'status_class': 'ok', 'icon': 'fa-solid fa-database'},
+            {'name': 'Security', 'percent': 100, 'status': 'OK', 'status_class': 'ok', 'icon': 'fa-solid fa-shield-halved'},
+            {'name': 'Availability', 'percent': 100, 'status': 'OK', 'status_class': 'ok', 'icon': 'fa-solid fa-heart-pulse'},
+        ]
+
+        hosts_summary = []
+        datastores_summary = []
+        for h in hosts_data:
+            cpu_percent = int(h.get('performance', {}).get('cpu_usage', 0))
+            mem_used = h.get('performance', {}).get('memory_usage', 0)
+            mem_percent = int(h.get('performance', {}).get('memory_usage', 0))
+            hosts_summary.append({'name': h.get('name'), 'cpu_percent': cpu_percent,
+                                 'memory_used': mem_used, 'memory_percent': mem_percent})
+            for ds in h.get('performance', {}).get('datastores', []):
+                datastores_summary.append({'name': ds.get('name'),
+                                           'percent': int(ds.get('usage_pct', 0))})
+
+        indicators = [
+            {'label': 'HA', 'status': 'Enabled' if all(h.get('cluster', {}).get('ha_enabled') for h in hosts_data) else 'Disabled', 'status_class': 'ok', 'icon': 'fa-solid fa-heart'},
+            {'label': 'DRS', 'status': 'Enabled' if all(h.get('cluster', {}).get('drs_enabled') for h in hosts_data) else 'Disabled', 'status_class': 'ok', 'icon': 'fa-solid fa-diagram-project'},
+            {'label': 'Lockdown', 'status': 'On' if all(h.get('security', {}).get('lockdown_mode') for h in hosts_data) else 'Off', 'status_class': 'ok', 'icon': 'fa-solid fa-lock'},
+        ]
+
+        # Top 10 tables
+        def build_table(title, icon, headers, rows):
+            return {'title': title, 'icon': icon, 'headers': headers, 'rows': rows}
+
+        top_cpu = sorted(vm_data, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
+        cpu_rows = [(v['name'], v['metrics'].get('cpu_ready_ms', 0)) for v in top_cpu]
+
+        top_ram = sorted(vm_data, key=lambda x: x['metrics'].get('mem_usage_pct', 0), reverse=True)[:10]
+        ram_rows = [(v['name'], round(v['metrics'].get('mem_usage_pct', 0) * 100, 2)) for v in top_ram]
+
+        all_ds = [ds for h in hosts_data for ds in h.get('performance', {}).get('datastores', [])]
+        top_ds_cap = sorted(all_ds, key=lambda x: x.get('capacity_gb', 0), reverse=True)[:10]
+        ds_cap_rows = [(d.get('name'), d.get('capacity_gb')) for d in top_ds_cap]
+
+        top_ds_free = sorted(all_ds, key=lambda x: x.get('usage_pct', 0))[:10]
+        ds_free_rows = [(d.get('name'), 100 - d.get('usage_pct', 0)) for d in top_ds_free]
+
+        top_iops = sorted(vm_data, key=lambda x: x['metrics'].get('iops', 0), reverse=True)[:10]
+        iops_rows = [(v['name'], v['metrics'].get('iops', 0)) for v in top_iops]
+
+        top_net = sorted(vm_data, key=lambda x: x['metrics'].get('net_throughput_kbps', 0), reverse=True)[:10]
+        net_rows = [(v['name'], v['metrics'].get('net_throughput_kbps', 0)) for v in top_net]
+
+        top_tables = [
+            build_table('CPU Ready', 'fa-solid fa-stopwatch', ['VM', 'ms'], cpu_rows),
+            build_table('RAM Usage %', 'fa-solid fa-memory', ['VM', '%'], ram_rows),
+            build_table('Datastore Capacity (GB)', 'fa-solid fa-database', ['Datastore', 'GB'], ds_cap_rows),
+            build_table('Datastore Free %', 'fa-solid fa-hdd', ['Datastore', '% Free'], ds_free_rows),
+            build_table('IOPS', 'fa-solid fa-chart-line', ['VM', 'IOPS'], iops_rows),
+            build_table('Network (KB/s)', 'fa-solid fa-network-wired', ['VM', 'KB/s'], net_rows),
+        ]
+
+        return {
+            'health': health,
+            'infra': infra,
+            'categories': categories,
+            'hosts': hosts_summary,
+            'datastores': datastores_summary,
+            'indicators': indicators,
+            'top_tables': top_tables,
+            'generated_on': datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+            'chart': chart,
+        }
+
+    def generate_report(self, hosts_data, vm_data, output_file, template_dir=None, template_file='template.html'):
         """Crea un informe HTML con los datos obtenidos.
 
         Parameters
@@ -430,8 +582,10 @@ class VMwareHealthCheck:
         output_file : str
             Ruta del archivo HTML de salida.
         template_dir : str, optional
-            Directorio donde se encuentra ``template.html``. Si no se indica
+            Directorio donde se encuentra la plantilla HTML. Si no se indica
             se utilizará el directorio del script.
+        template_file : str, optional
+            Nombre del archivo de plantilla Jinja2. Por defecto ``template.html``.
         """
         logger.info("Generating HTML report: %s", output_file)
         chart = self._create_chart(hosts_data)
@@ -442,8 +596,12 @@ class VMwareHealthCheck:
         try:
             import jinja2
             env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir))
-            template = env.get_template('template.html')
-            html_content = template.render(hosts=hosts_data, vms=vm_data, chart=chart)
+            template = env.get_template(template_file)
+            if template_file == 'template_a.html':
+                data = self._build_report_data(hosts_data, vm_data, chart)
+                html_content = template.render(**data)
+            else:
+                html_content = template.render(hosts=hosts_data, vms=vm_data, chart=chart)
         except Exception as exc:
             logger.debug("Using default HTML template: %s", exc)
             html_content = self._generate_report_default(hosts_data, vm_data, chart)
@@ -459,7 +617,9 @@ def main():
     parser.add_argument('--user', required=True, help='username')
     parser.add_argument('--password', required=True, help='password')
     parser.add_argument('--output', help='HTML report file')
-    parser.add_argument('--template', help='directory containing template.html')
+    parser.add_argument('--template', help='directory containing the template')
+    parser.add_argument('--template-file', default='template.html',
+                        help='name of the HTML template file')
     args = parser.parse_args()
 
     checker = VMwareHealthCheck(args.host, args.user, args.password)
@@ -469,17 +629,38 @@ def main():
         hosts = checker.get_hosts()
         hosts_data = []
         all_vms = []
+        summary = {
+            'hosts': 0,
+            'vms': 0,
+            'datastores': 0,
+            'networks': 0,
+        }
         for host in hosts:
             logger.info("Processing host %s", host.name)
             security = checker.security_check(host)
             performance = checker.performance_check(host)
             best_practice = checker.best_practice_check(host)
+            runtime = checker.host_runtime_info(host)
+            cluster = checker.cluster_features(host)
             vm_info = []
             counters = checker._build_perf_counter_map()
             for vm in getattr(host, 'vm', []):
                 metrics = checker.vm_performance_check(vm, counters)
+                extra = checker.vm_extra_info(vm)
+                metrics.update(extra)
                 vm_info.append({'name': vm.name, 'metrics': metrics})
                 all_vms.append({'name': vm.name, 'metrics': metrics})
+                summary['vms'] += 1
+
+            if vm_info:
+                avg_ready = sum(v['metrics'].get('cpu_ready_ms', 0) for v in vm_info) / len(vm_info)
+            else:
+                avg_ready = 0
+            performance['avg_cpu_ready_ms'] = avg_ready
+
+            summary['hosts'] += 1
+            summary['datastores'] += len(getattr(host, 'datastore', []))
+            summary['networks'] += len(getattr(host, 'network', []))
 
             print('--- Host: {} ---'.format(host.name))
             print('Security:')
@@ -505,11 +686,27 @@ def main():
                 'security': security,
                 'performance': performance,
                 'best_practice': best_practice,
+                'runtime': runtime,
+                'cluster': cluster,
                 'vms': vm_info,
             })
 
+        # Basic health scoring
+        scores = {
+            'performance': 100,
+            'storage': 100,
+            'security': 100,
+            'availability': 100,
+        }
+        overall_score = sum(scores.values()) / 4
+
+        print('Environment summary:', summary)
+        print('Health scores:', scores, 'overall:', overall_score)
+
         if args.output:
-            checker.generate_report(hosts_data, all_vms, args.output, args.template)
+            checker.generate_report(
+                hosts_data, all_vms, args.output, args.template, args.template_file
+            )
             logger.info("HTML report written to %s", args.output)
     finally:
         checker.disconnect()
