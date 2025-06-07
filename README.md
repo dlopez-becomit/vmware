@@ -19,6 +19,7 @@ Este repositorio incluye una herramienta sencilla escrita en Python que se conec
    python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> --output reporte.html
    ```
 
-El script mostrará por pantalla un resumen de la información recopilada para cada host detectado.
+El script mostrará por pantalla un resumen de la información recopilada para cada host y para cada máquina virtual encontrada.
+El informe HTML incluye ahora un ranking con las 10 máquinas virtuales con mayor **CPU Ready** y tablas con métricas detalladas de CPU, memoria, disco y red por VM.
 
 **Nota**: este script es un punto de partida y no sustituye a una auditoría completa. Puede ampliarse para cubrir todas las comprobaciones de seguridad, rendimiento y mejores prácticas descritas en la solicitud original.
