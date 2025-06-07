@@ -39,6 +39,15 @@ Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un form
 
 Las comprobaciones se han ampliado para registrar el tiempo de actividad de cada host, detectar si el clúster tiene activados HA y DRS, y para cada VM revisar la presencia de instantáneas y el estado de VMware Tools.
 
+Adicionalmente, la versión actual realiza comprobaciones básicas de:
+
+- Configuración de servidores NTP en los hosts.
+- Asignación de licencias en vCenter/ESXi.
+- Existencia de resource pools en los clústeres.
+- Inconsistencias de carpetas o VMs duplicadas.
+- Búsqueda de VMDK "zombies" no asociados a una VM.
+- Presencia de snapshots como indicativo de copias de seguridad.
+
 El informe generado con `template_a.html` muestra nuevas secciones: un **Health Score** con métricas globales, un resumen por categorías (rendimiento, almacenamiento, seguridad y disponibilidad), indicadores de componentes clave y varias tablas con los 10 elementos más relevantes (CPU Ready, uso de RAM, capacidad de datastores, IOPS y tráfico de red).
 
 
