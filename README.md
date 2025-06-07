@@ -9,9 +9,16 @@ Este repositorio incluye una herramienta sencilla escrita en Python que se conec
 
 ## Instalación
 
-1. Instale las dependencias:
+1. Instale las dependencias ejecutando el script `setup.sh` o, si lo prefiere,
+   instálelas manualmente:
    ```bash
+   ./setup.sh  # instala automáticamente
+   # o bien
    pip install -r requirements.txt
+   ```
+   Para comprobar que Jinja2 se instaló correctamente puede ejecutar:
+   ```bash
+   python -c "import jinja2"
    ```
 
 2. Ejecute el script proporcionando los datos de conexión. Puede especificar opcionalmente un archivo de salida HTML:
