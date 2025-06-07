@@ -125,8 +125,41 @@ class VMwareHealthCheck:
         perf = {
             'cpu_usage': stats.overallCpuUsage,
             'memory_usage': stats.overallMemoryUsage,
-            'num_vms': len(getattr(host, 'vm', []))
+            'num_vms': len(getattr(host, 'vm', [])),
+            'network_usage_kbps': getattr(stats, 'overallNetworkUsage', 0)
         }
+
+        # Datastore usage aggregated across all datastores assigned to the host
+        datastore_stats = []
+        for ds in getattr(host, 'datastore', []):
+            try:
+                summary = ds.summary
+                datastore_stats.append({
+                    'name': summary.name,
+                    'capacity_gb': summary.capacity / (1024 ** 3),
+                    'free_gb': summary.freeSpace / (1024 ** 3)
+                })
+            except Exception:
+                continue
+        perf['datastores'] = datastore_stats
+
+        # Basic information about physical NICs
+        nic_stats = []
+        for pnic in getattr(host.config.network, 'pnic', []):
+            nic_stats.append({
+                'device': pnic.device,
+                'speed_mb': getattr(getattr(pnic, 'linkSpeed', None), 'speedMb', 'n/a')
+            })
+        perf['network'] = nic_stats
+
+        # Firmware information can also be interesting from a performance point of view
+        hw = host.hardware
+        perf['firmware'] = {
+            'bios_version': getattr(hw.biosInfo, 'biosVersion', 'n/a'),
+            'vendor': getattr(hw.systemInfo, 'vendor', 'n/a'),
+            'model': getattr(hw.systemInfo, 'model', 'n/a'),
+        }
+
         # Additional metrics can be gathered from host.configManager or perfManager
         return perf
 
@@ -139,21 +172,22 @@ class VMwareHealthCheck:
             counters[full] = c.key
         return counters
 
-    def vm_performance_check(self, vm, counters=None):
+    def vm_performance_check(self, vm, counters=None, metric_names=None):
         """Gather VM level performance metrics."""
         pm = self.si.content.perfManager
         if counters is None:
             counters = self._build_perf_counter_map()
 
-        metric_names = {
-            'cpu.ready.summation': 'cpu_ready_ms',
-            'cpu.usage.average': 'cpu_usage_pct',
-            'mem.usage.average': 'mem_usage_pct',
-            'disk.numberRead.summation': 'disk_reads',
-            'disk.numberWrite.summation': 'disk_writes',
-            'net.received.average': 'net_rx_kbps',
-            'net.transmitted.average': 'net_tx_kbps',
-        }
+        if metric_names is None:
+            metric_names = {
+                'cpu.ready.summation': 'cpu_ready_ms',
+                'cpu.usage.average': 'cpu_usage_pct',
+                'mem.usage.average': 'mem_usage_pct',
+                'disk.numberRead.summation': 'disk_reads',
+                'disk.numberWrite.summation': 'disk_writes',
+                'net.received.average': 'net_rx_kbps',
+                'net.transmitted.average': 'net_tx_kbps',
+            }
 
         metric_ids = []
         for key in metric_names:
@@ -187,8 +221,36 @@ class VMwareHealthCheck:
         bp['cpu_model'] = hardware.cpuPkg[0].description if hardware.cpuPkg else 'n/a'
         # Convert memory size from bytes to gigabytes for easier readability
         bp['memory_total_gb'] = hardware.memorySize / (1024 ** 3)
-        bp['datastores'] = [ds.info.name for ds in host.datastore]
-        bp['network'] = [nw.name for nw in host.network]
+
+        # Detailed datastore information
+        datastore_info = []
+        for ds in host.datastore:
+            try:
+                summary = ds.summary
+                datastore_info.append({
+                    'name': summary.name,
+                    'capacity_gb': summary.capacity / (1024 ** 3),
+                    'free_gb': summary.freeSpace / (1024 ** 3)
+                })
+            except Exception:
+                continue
+        bp['datastores'] = datastore_info
+
+        # Basic network interface details
+        nic_info = []
+        for pnic in getattr(host.config.network, 'pnic', []):
+            nic_info.append({
+                'device': pnic.device,
+                'speed_mb': getattr(getattr(pnic, 'linkSpeed', None), 'speedMb', 'n/a')
+            })
+        bp['network'] = nic_info
+
+        # Firmware information
+        bp['firmware'] = {
+            'bios_version': getattr(hardware.biosInfo, 'biosVersion', 'n/a'),
+            'vendor': getattr(hardware.systemInfo, 'vendor', 'n/a'),
+            'model': getattr(hardware.systemInfo, 'model', 'n/a'),
+        }
         return bp
 
     def _create_chart(self, hosts_data):
@@ -261,14 +323,50 @@ class VMwareHealthCheck:
             html.append("</table>")
 
             html.append("<h3>Performance</h3><table>")
-            for k, v in h['performance'].items():
-                html.append(f"<tr><th>{k}</th><td>{v}</td></tr>")
+            perf_basic = ['cpu_usage', 'memory_usage', 'num_vms', 'network_usage_kbps']
+            for k in perf_basic:
+                if k in h['performance']:
+                    html.append(f"<tr><th>{k}</th><td>{h['performance'][k]}</td></tr>")
             html.append("</table>")
 
+            if h['performance'].get('datastores'):
+                html.append("<h4>Datastores</h4>")
+                html.append("<table><tr><th>Name</th><th>Capacity (GB)</th><th>Free (GB)</th></tr>")
+                for ds in h['performance']['datastores']:
+                    html.append(f"<tr><td>{ds['name']}</td><td>{ds['capacity_gb']:.1f}</td><td>{ds['free_gb']:.1f}</td></tr>")
+                html.append("</table>")
+
+            if h['performance'].get('network'):
+                html.append("<h4>Network Interfaces</h4>")
+                html.append("<table><tr><th>Device</th><th>Speed (Mb)</th></tr>")
+                for nic in h['performance']['network']:
+                    html.append(f"<tr><td>{nic['device']}</td><td>{nic['speed_mb']}</td></tr>")
+                html.append("</table>")
+
             html.append("<h3>Best Practices</h3><table>")
-            for k, v in h['best_practice'].items():
-                html.append(f"<tr><th>{k}</th><td>{v}</td></tr>")
+            html.append(f"<tr><th>cpu_model</th><td>{h['best_practice'].get('cpu_model')}</td></tr>")
+            html.append(f"<tr><th>memory_total_gb</th><td>{h['best_practice'].get('memory_total_gb')}</td></tr>")
             html.append("</table>")
+
+            if h['best_practice'].get('datastores'):
+                html.append("<h4>Datastores</h4><table><tr><th>Name</th><th>Capacity (GB)</th><th>Free (GB)</th></tr>")
+                for ds in h['best_practice']['datastores']:
+                    html.append(f"<tr><td>{ds['name']}</td><td>{ds['capacity_gb']:.1f}</td><td>{ds['free_gb']:.1f}</td></tr>")
+                html.append("</table>")
+
+            if h['best_practice'].get('network'):
+                html.append("<h4>Network Interfaces</h4><table><tr><th>Device</th><th>Speed (Mb)</th></tr>")
+                for nic in h['best_practice']['network']:
+                    html.append(f"<tr><td>{nic['device']}</td><td>{nic['speed_mb']}</td></tr>")
+                html.append("</table>")
+
+            if h['best_practice'].get('firmware'):
+                fw = h['best_practice']['firmware']
+                html.append("<h4>Firmware</h4><table>")
+                html.append(f"<tr><th>Vendor</th><td>{fw.get('vendor')}</td></tr>")
+                html.append(f"<tr><th>Model</th><td>{fw.get('model')}</td></tr>")
+                html.append(f"<tr><th>BIOS Version</th><td>{fw.get('bios_version')}</td></tr>")
+                html.append("</table>")
 
             if h.get('vms'):
                 html.append("<h3>VM Metrics</h3>")
