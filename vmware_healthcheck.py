@@ -130,6 +130,18 @@ class VMwareHealthCheck:
             'network_usage_kbps': getattr(stats, 'overallNetworkUsage', 0)
         }
 
+        hw_summary = summary.hardware
+        cpu_capacity = hw_summary.cpuMhz * hw_summary.numCpuCores
+        mem_capacity = hw_summary.memorySize / (1024 ** 2)
+        if cpu_capacity:
+            perf['cpu_usage_pct'] = round(stats.overallCpuUsage / cpu_capacity * 100, 2)
+        else:
+            perf['cpu_usage_pct'] = 0
+        if mem_capacity:
+            perf['memory_usage_pct'] = round(stats.overallMemoryUsage / mem_capacity * 100, 2)
+        else:
+            perf['memory_usage_pct'] = 0
+
         # Datastore usage aggregated across all datastores assigned to the host
         datastore_stats = []
         for ds in getattr(host, 'datastore', []):
@@ -248,6 +260,14 @@ class VMwareHealthCheck:
         metrics['net_throughput_kbps'] = (
             metrics.get('net_rx_kbps', 0) + metrics.get('net_tx_kbps', 0)
         )
+
+        mem_cfg = getattr(getattr(vm, 'config', None), 'hardware', None)
+        if mem_cfg and getattr(mem_cfg, 'memoryMB', None) is not None:
+            mem_config_gb = mem_cfg.memoryMB / 1024
+        else:
+            mem_config_gb = 0
+        metrics['mem_config_gb'] = mem_config_gb
+        metrics['mem_usage_gb'] = round(mem_config_gb * metrics['mem_usage_pct'], 2)
         if metrics['cpu_ready_ms'] > 200:
             metrics['cpu_ready_class'] = 'poor'
         elif metrics['cpu_ready_ms'] > 100:
@@ -480,95 +500,132 @@ class VMwareHealthCheck:
         """Construye la estructura de datos para la plantilla avanzada."""
         import datetime
 
-        # Resumen global simple
+        def status_from_score(score):
+            if score >= 80:
+                return 'ok'
+            elif score >= 60:
+                return 'warning'
+            return 'critical'
+
         uptime = sum(h.get('runtime', {}).get('uptime_seconds', 0) for h in hosts_data)
         avg_uptime_days = uptime / max(len(hosts_data), 1) / 86400
+
         total_datastores = sum(len(h.get('performance', {}).get('datastores', [])) for h in hosts_data)
         total_networks = sum(len(h.get('best_practice', {}).get('network', [])) for h in hosts_data)
 
-        health_score = 100
-        health = {
-            'score': int(health_score),
-            'status_class': 'optimal',
-            'status_text': 'OK',
-            'uptime_days': int(avg_uptime_days),
-            'alerts': 0,
-            'sla': 100,
-        }
+        all_ready = [v['metrics'].get('cpu_ready_ms', 0) for v in vm_data]
+        avg_ready = sum(all_ready) / len(all_ready) if all_ready else 0
+        performance_score = max(0, 100 - min(avg_ready, 200) / 2)
 
-        infra = {
-            'hosts': len(hosts_data),
-            'vms': len(vm_data),
-            'datastores': total_datastores,
-            'networks': total_networks,
-        }
+        usage_vals = [ds['usage_pct'] for h in hosts_data for ds in h.get('performance', {}).get('datastores', [])]
+        avg_usage = sum(usage_vals) / len(usage_vals) if usage_vals else 0
+        storage_score = max(0, 100 - avg_usage)
+
+        insecure = 0
+        for h in hosts_data:
+            services = h.get('security', {}).get('services', {})
+            if services.get('ssh'):
+                insecure += 1
+            if services.get('esxi_shell'):
+                insecure += 1
+        for vm in vm_data:
+            if vm['metrics'].get('has_snapshot'):
+                insecure += 1
+            tools = vm['metrics'].get('tools_status')
+            if tools not in (None, 'toolsOk', 'guestToolsRunning'):
+                insecure += 1
+        security_score = max(0, 100 - insecure * 5)
+
+        ha_all = all(h.get('cluster', {}).get('ha_enabled') for h in hosts_data)
+        drs_all = all(h.get('cluster', {}).get('drs_enabled') for h in hosts_data)
+        if ha_all and drs_all:
+            availability_score = 100
+        elif ha_all or drs_all:
+            availability_score = 70
+        else:
+            availability_score = 40
 
         categories = [
-            {'name': 'Performance', 'percent': 100, 'status': 'OK', 'status_class': 'ok', 'icon': 'fa-solid fa-gauge-high'},
-            {'name': 'Storage', 'percent': 100, 'status': 'OK', 'status_class': 'ok', 'icon': 'fa-solid fa-database'},
-            {'name': 'Security', 'percent': 100, 'status': 'OK', 'status_class': 'ok', 'icon': 'fa-solid fa-shield-halved'},
-            {'name': 'Availability', 'percent': 100, 'status': 'OK', 'status_class': 'ok', 'icon': 'fa-solid fa-heart-pulse'},
+            {'name': 'Rendimiento', 'score': int(performance_score), 'status': status_from_score(performance_score), 'icon': 'fa-solid fa-tachometer-alt'},
+            {'name': 'Almacenamiento', 'score': int(storage_score), 'status': status_from_score(storage_score), 'icon': 'fa-solid fa-hdd'},
+            {'name': 'Seguridad', 'score': int(security_score), 'status': status_from_score(security_score), 'icon': 'fa-solid fa-shield'},
+            {'name': 'Disponibilidad', 'score': int(availability_score), 'status': status_from_score(availability_score), 'icon': 'fa-solid fa-plug-circle-bolt'},
         ]
 
-        hosts_summary = []
-        datastores_summary = []
+        avg_cat = sum(c['score'] for c in categories) / len(categories)
+        health_score = round(avg_cat / 20, 1)
+        if health_score >= 4.5:
+            health_state = 'optimal'
+            health_msg = 'Óptimo'
+        elif health_score >= 3:
+            health_state = 'warning'
+            health_msg = 'Estable con Advertencias'
+        else:
+            health_state = 'critical'
+            health_msg = 'Crítico'
+
+        cpu_hosts = []
+        ram_hosts = []
+        datastore_usage = []
         for h in hosts_data:
-            cpu_percent = int(h.get('performance', {}).get('cpu_usage', 0))
-            mem_used = h.get('performance', {}).get('memory_usage', 0)
-            mem_percent = int(h.get('performance', {}).get('memory_usage', 0))
-            hosts_summary.append({'name': h.get('name'), 'cpu_percent': cpu_percent,
-                                 'memory_used': mem_used, 'memory_percent': mem_percent})
+            cpu_pct = h.get('performance', {}).get('cpu_usage_pct', 0)
+            mem_pct = h.get('performance', {}).get('memory_usage_pct', 0)
+            mem_used_gb = h.get('performance', {}).get('memory_usage', 0) / 1024
+            cpu_hosts.append({'name': h.get('name'), 'percent': int(cpu_pct)})
+            ram_hosts.append({'name': h.get('name'), 'percent': int(mem_pct), 'value': f"{mem_used_gb:.1f}GB"})
             for ds in h.get('performance', {}).get('datastores', []):
-                datastores_summary.append({'name': ds.get('name'),
-                                           'percent': int(ds.get('usage_pct', 0))})
+                datastore_usage.append({'name': ds.get('name'), 'percent': int(ds.get('usage_pct', 0))})
 
         indicators = [
-            {'label': 'HA', 'status': 'Enabled' if all(h.get('cluster', {}).get('ha_enabled') for h in hosts_data) else 'Disabled', 'status_class': 'ok', 'icon': 'fa-solid fa-heart'},
-            {'label': 'DRS', 'status': 'Enabled' if all(h.get('cluster', {}).get('drs_enabled') for h in hosts_data) else 'Disabled', 'status_class': 'ok', 'icon': 'fa-solid fa-diagram-project'},
-            {'label': 'Lockdown', 'status': 'On' if all(h.get('security', {}).get('lockdown_mode') for h in hosts_data) else 'Off', 'status_class': 'ok', 'icon': 'fa-solid fa-lock'},
+            {'icon': 'fa-solid fa-shield-halved', 'label': 'HA', 'status': 'ok' if ha_all else 'critical', 'text': 'Enabled' if ha_all else 'Disabled'},
+            {'icon': 'fa-solid fa-arrows-to-circle', 'label': 'DRS', 'status': 'ok' if drs_all else 'critical', 'text': 'Enabled' if drs_all else 'Disabled'},
+            {'icon': 'fa-solid fa-camera', 'label': 'Snapshots', 'status': 'warning' if any(vm['metrics'].get('has_snapshot') for vm in vm_data) else 'ok', 'text': 'Warning' if any(vm['metrics'].get('has_snapshot') for vm in vm_data) else 'OK'},
+            {'icon': 'fa-solid fa-wrench', 'label': 'VMware Tools', 'status': 'warning' if any(vm['metrics'].get('tools_status') not in (None, 'toolsOk', 'guestToolsRunning') for vm in vm_data) else 'ok', 'text': 'Warning' if any(vm['metrics'].get('tools_status') not in (None, 'toolsOk', 'guestToolsRunning') for vm in vm_data) else 'OK'},
+            {'icon': 'fa-solid fa-terminal', 'label': 'SSH', 'status': 'warning' if any(h.get('security', {}).get('services', {}).get('ssh') for h in hosts_data) else 'ok', 'text': 'Warning' if any(h.get('security', {}).get('services', {}).get('ssh') for h in hosts_data) else 'OK'},
         ]
 
-        # Top 10 tables
-        def build_table(title, icon, headers, rows):
-            return {'title': title, 'icon': icon, 'headers': headers, 'rows': rows}
+        # Top lists
+        top_cpu_ready = sorted(vm_data, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
+        top_ram = sorted(vm_data, key=lambda x: x['metrics'].get('mem_config_gb', 0), reverse=True)[:10]
+        datastores_list = [ds for h in hosts_data for ds in h.get('performance', {}).get('datastores', [])]
+        datastores_sorted = sorted(datastores_list, key=lambda x: x.get('capacity_gb', 0), reverse=True)[:10]
 
-        top_cpu = sorted(vm_data, key=lambda x: x['metrics'].get('cpu_ready_ms', 0), reverse=True)[:10]
-        cpu_rows = [(v['name'], v['metrics'].get('cpu_ready_ms', 0)) for v in top_cpu]
-
-        top_ram = sorted(vm_data, key=lambda x: x['metrics'].get('mem_usage_pct', 0), reverse=True)[:10]
-        ram_rows = [(v['name'], round(v['metrics'].get('mem_usage_pct', 0) * 100, 2)) for v in top_ram]
-
-        all_ds = [ds for h in hosts_data for ds in h.get('performance', {}).get('datastores', [])]
-        top_ds_cap = sorted(all_ds, key=lambda x: x.get('capacity_gb', 0), reverse=True)[:10]
-        ds_cap_rows = [(d.get('name'), d.get('capacity_gb')) for d in top_ds_cap]
-
-        top_ds_free = sorted(all_ds, key=lambda x: x.get('usage_pct', 0))[:10]
-        ds_free_rows = [(d.get('name'), 100 - d.get('usage_pct', 0)) for d in top_ds_free]
+        host_disk_free = []
+        for h in hosts_data:
+            usage = [ds.get('usage_pct', 0) for ds in h.get('performance', {}).get('datastores', [])]
+            if usage:
+                free = 100 - sum(usage) / len(usage)
+            else:
+                free = 0
+            host_disk_free.append({'name': h.get('name'), 'free_pct': round(free, 2)})
+        top_disk_free = sorted(host_disk_free, key=lambda x: x['free_pct'], reverse=True)[:10]
 
         top_iops = sorted(vm_data, key=lambda x: x['metrics'].get('iops', 0), reverse=True)[:10]
-        iops_rows = [(v['name'], v['metrics'].get('iops', 0)) for v in top_iops]
-
-        top_net = sorted(vm_data, key=lambda x: x['metrics'].get('net_throughput_kbps', 0), reverse=True)[:10]
-        net_rows = [(v['name'], v['metrics'].get('net_throughput_kbps', 0)) for v in top_net]
-
-        top_tables = [
-            build_table('CPU Ready', 'fa-solid fa-stopwatch', ['VM', 'ms'], cpu_rows),
-            build_table('RAM Usage %', 'fa-solid fa-memory', ['VM', '%'], ram_rows),
-            build_table('Datastore Capacity (GB)', 'fa-solid fa-database', ['Datastore', 'GB'], ds_cap_rows),
-            build_table('Datastore Free %', 'fa-solid fa-hdd', ['Datastore', '% Free'], ds_free_rows),
-            build_table('IOPS', 'fa-solid fa-chart-line', ['VM', 'IOPS'], iops_rows),
-            build_table('Network (KB/s)', 'fa-solid fa-network-wired', ['VM', 'KB/s'], net_rows),
-        ]
+        top_network = sorted(vm_data, key=lambda x: x['metrics'].get('net_throughput_kbps', 0), reverse=True)[:10]
 
         return {
-            'health': health,
-            'infra': infra,
+            'health_score': health_score,
+            'health_state': health_state,
+            'health_message': health_msg,
+            'uptime': f"{int(avg_uptime_days)} días",
+            'alerts': 0,
+            'sla': '100%',
+            'hosts': hosts_data,
+            'vms': vm_data,
+            'datastores_count': total_datastores,
+            'networks_count': total_networks,
             'categories': categories,
-            'hosts': hosts_summary,
-            'datastores': datastores_summary,
+            'cpu_hosts': cpu_hosts,
+            'ram_hosts': ram_hosts,
+            'datastore_usage': datastore_usage,
             'indicators': indicators,
-            'top_tables': top_tables,
-            'generated_on': datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+            'top_cpu_ready': top_cpu_ready,
+            'top_ram': top_ram,
+            'datastores': datastores_sorted,
+            'top_disk_free': top_disk_free,
+            'top_iops': top_iops,
+            'top_network': top_network,
+            'report_date': datetime.datetime.utcnow().strftime('%d-%m-%Y'),
             'chart': chart,
         }
 
