@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VMware Health Check Report</title>
+<style>
+  body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+      color: #333;
+  }
+  .container {
+      max-width: 960px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  h1, h2, h3, h4 {
+      color: #2c3e50;
+      margin-top: 1em;
+  }
+  table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1em;
+  }
+  th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+  }
+  th {
+      background-color: #fafafa;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>VMware Health Check Report</h1>
+    <img src="data:image/png;base64,{{ chart }}" alt="Resource Usage Chart" style="max-width:100%;"/>
+
+    <h2>Top 10 VMs by CPU Ready</h2>
+    <table>
+      <tr><th>VM</th><th>CPU Ready (ms)</th></tr>
+      {% for vm in vms|sort(attribute='metrics.cpu_ready_ms', reverse=True)[:10] %}
+      <tr><td>{{ vm.name }}</td><td>{{ vm.metrics.cpu_ready_ms }}</td></tr>
+      {% endfor %}
+    </table>
+
+    {% for host in hosts %}
+    <h2>Host: {{ host.name }}</h2>
+    <h3>Security</h3>
+    <table>
+      {% for k, v in host.security.items() %}
+      <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+      {% endfor %}
+    </table>
+
+    <h3>Performance</h3>
+    <table>
+      {% for k, v in host.performance.items() if k in ['cpu_usage','memory_usage','num_vms','network_usage_kbps'] %}
+      <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+      {% endfor %}
+    </table>
+
+    {% if host.performance.datastores %}
+    <h4>Datastores</h4>
+    <table>
+      <tr><th>Name</th><th>Capacity (GB)</th><th>Free (GB)</th></tr>
+      {% for ds in host.performance.datastores %}
+      <tr>
+        <td>{{ ds.name }}</td>
+        <td>{{ '%.1f'|format(ds.capacity_gb) }}</td>
+        <td>{{ '%.1f'|format(ds.free_gb) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    <h3>Best Practices</h3>
+    <table>
+      {% for k, v in host.best_practice.items() if k not in ['datastores','network','firmware'] %}
+      <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+      {% endfor %}
+    </table>
+
+    {% if host.best_practice.datastores %}
+    <h4>Datastores</h4>
+    <table>
+      <tr><th>Name</th><th>Capacity (GB)</th><th>Free (GB)</th></tr>
+      {% for ds in host.best_practice.datastores %}
+      <tr>
+        {% if ds.name is defined %}
+        <td>{{ ds.name }}</td>
+        <td>{{ '%.1f'|format(ds.capacity_gb) }}</td>
+        <td>{{ '%.1f'|format(ds.free_gb) }}</td>
+        {% else %}
+        <td>{{ ds }}</td>
+        <td>n/a</td>
+        <td>n/a</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if host.best_practice.network %}
+    <h4>Network Interfaces</h4>
+    <table>
+      <tr><th>Device</th><th>Speed (Mb)</th></tr>
+      {% for nic in host.best_practice.network %}
+      <tr><td>{{ nic.device }}</td><td>{{ nic.speed_mb }}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if host.best_practice.firmware %}
+    <h4>Firmware</h4>
+    <table>
+      <tr><th>Vendor</th><td>{{ host.best_practice.firmware.vendor }}</td></tr>
+      <tr><th>Model</th><td>{{ host.best_practice.firmware.model }}</td></tr>
+      <tr><th>BIOS Version</th><td>{{ host.best_practice.firmware.bios_version }}</td></tr>
+    </table>
+    {% endif %}
+
+    {% if host.vms %}
+    <h3>VM Metrics</h3>
+    <table>
+      <tr><th>Name</th><th>CPU Ready (ms)</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th><th>Disk Reads (ops)</th><th>Disk Writes (ops)</th><th>Net RX (KB/s)</th><th>Net TX (KB/s)</th></tr>
+      {% for vm in host.vms %}
+      <tr>
+        <td>{{ vm.name }}</td>
+        <td>{{ vm.metrics.cpu_ready_ms }}</td>
+        <td>{{ (vm.metrics.cpu_usage_pct * 100)|round(2) }}</td>
+        <td>{{ (vm.metrics.mem_usage_pct * 100)|round(2) }}</td>
+        <td>{{ vm.metrics.disk_reads }}</td>
+        <td>{{ vm.metrics.disk_writes }}</td>
+        <td>{{ vm.metrics.net_rx_kbps }}</td>
+        <td>{{ vm.metrics.net_tx_kbps }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    {% endfor %}
+  </div>
+</body>
+</html>
