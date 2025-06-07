@@ -193,5 +193,48 @@ class VMwareHealthCheckTests(unittest.TestCase):
                 content = f.read()
             self.assertIn('Rendered template_a.html', content)
 
+    def test_generate_report_template_a_content(self):
+        checker = VMwareHealthCheck('h', 'u', 'p')
+        hosts_data = [{
+            'name': 'host1',
+            'security': {'lockdown_mode': 'strict'},
+            'performance': {
+                'cpu_usage': 10,
+                'memory_usage': 20,
+                'datastores': [{'name': 'ds1', 'capacity_gb': 1, 'free_gb': 0.5, 'usage_pct': 50}],
+            },
+            'best_practice': {'network': ['n1']},
+            'cluster': {'ha_enabled': True, 'drs_enabled': False},
+            'runtime': {'uptime_seconds': 86400},
+            'vms': []
+        }]
+        vm_data = [{
+            'name': 'vm1',
+            'metrics': {
+                'cpu_ready_ms': 100,
+                'mem_usage_pct': 0.5,
+                'iops': 50,
+                'net_throughput_kbps': 1000
+            }
+        }]
+        with tempfile.TemporaryDirectory() as td:
+            output = os.path.join(td, 'report.html')
+            with mock.patch.object(checker, '_create_chart', return_value='img'):
+                def render_dummy(**ctx):
+                    return f"Score {ctx['health']['score']} Indicator {ctx['indicators'][0]['label']}"
+
+                dummy_jinja = types.SimpleNamespace(
+                    Environment=lambda loader: types.SimpleNamespace(
+                        get_template=lambda name: types.SimpleNamespace(render=render_dummy)
+                    ),
+                    FileSystemLoader=lambda path: None
+                )
+                with mock.patch.dict('sys.modules', {'jinja2': dummy_jinja}):
+                    checker.generate_report(hosts_data, vm_data, output, template_file='template_a.html')
+            with open(output, 'r', encoding='utf-8') as f:
+                content = f.read()
+            self.assertIn('Score 100', content)
+            self.assertIn('Indicator HA', content)
+
 if __name__ == '__main__':
     unittest.main()
