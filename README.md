@@ -5,7 +5,7 @@ Genera un informe HTML y, opcionalmente, un texto detallado empleando OpenAI o A
 
 ## Requisitos
 
-- Python 3.8+
+ - Python 3.9+
 - Dependencias indicadas en `requirements.txt` (`pyvmomi`, `matplotlib`, `jinja2`)
 
 ## Instalación
