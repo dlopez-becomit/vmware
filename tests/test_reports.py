@@ -288,3 +288,26 @@ def test_configure_openai_from_file(tmp_path):
     assert openai_mod.api_version == "v"
     assert openai_connector._DEFAULT_MODEL == "m"
 
+
+def test_configure_openai_env_overrides_file(monkeypatch, tmp_path):
+    cfg = {
+        "api_key": "file-key",
+        "api_type": "openai",
+        "model": "file-model",
+    }
+    cfg_file = tmp_path / "cfg.json"
+    cfg_file.write_text(json.dumps(cfg))
+
+    monkeypatch.setenv("OPENAI_API_KEY", "env-key")
+    monkeypatch.setenv("OPENAI_API_TYPE", "azure")
+    monkeypatch.setenv("OPENAI_MODEL", "env-model")
+
+    import openai_connector
+
+    openai_connector.configure_openai(config_file=str(cfg_file))
+    import openai as openai_mod
+
+    assert openai_mod.api_key == "env-key"
+    assert openai_mod.api_type == "azure"
+    assert openai_connector._DEFAULT_MODEL == "env-model"
+
