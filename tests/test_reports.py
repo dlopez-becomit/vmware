@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import types
 from unittest.mock import patch
 
@@ -213,3 +214,27 @@ def test_generate_report_html(tmp_path):
     assert 'Seguridad' in html
     assert 'Disponibilidad' in html
     assert 'AI text' in html
+
+
+def test_configure_openai_from_file(tmp_path):
+    cfg = {
+        "api_key": "key",
+        "api_type": "azure",
+        "api_base": "base",
+        "api_version": "v",
+        "model": "m",
+    }
+    cfg_file = tmp_path / "cfg.json"
+    cfg_file.write_text(json.dumps(cfg))
+
+    import openai_connector
+
+    openai_connector.configure_openai(config_file=str(cfg_file))
+    import openai as openai_mod
+
+    assert openai_mod.api_key == "key"
+    assert openai_mod.api_type == "azure"
+    assert openai_mod.api_base == "base"
+    assert openai_mod.api_version == "v"
+    assert openai_connector._DEFAULT_MODEL == "m"
+

@@ -52,6 +52,19 @@ export OPENAI_API_BASE=https://<tu-recurso>.openai.azure.com/
 export OPENAI_API_VERSION=2023-05-15
 export OPENAI_API_KEY=<clave>
 ```
+En lugar de variables de entorno también puede crearse un archivo
+`openai_config.json` con estos mismos campos. El script lo cargará
+automáticamente si está presente (o si se indica la ruta en
+`OPENAI_CONFIG_FILE`). Un ejemplo de su contenido es:
+```json
+{
+  "api_key": "sk-xxxxxxxx",
+  "api_type": "openai",
+  "api_base": "",
+  "api_version": "",
+  "model": "gpt-3.5-turbo"
+}
+```
 Si también se indica `--output`, el texto se incluirá al final del HTML.
 Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un formato extendido y botones para exportar o imprimir el informe. Para utilizarla basta con indicar el directorio donde se encuentra mediante `--template` y pasar `--template-file template_a.html`.
 

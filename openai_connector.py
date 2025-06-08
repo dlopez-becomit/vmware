@@ -1,23 +1,46 @@
 """Funciones auxiliares para conectar con OpenAI y Azure OpenAI."""
 
 import os
+import json
 import openai
 
+_DEFAULT_MODEL = None
 
-def configure_openai(api_key=None, api_type=None, api_base=None, api_version=None):
+
+def load_openai_config(path=None):
+    """Carga la configuración de OpenAI desde un archivo JSON."""
+    config_path = path or os.getenv("OPENAI_CONFIG_FILE", "openai_config.json")
+    if not os.path.isfile(config_path):
+        return {}
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def configure_openai(api_key=None, api_type=None, api_base=None, api_version=None, model=None, config_file=None):
     """Configura la librería ``openai`` para usar OpenAI o Azure OpenAI."""
-    openai.api_key = api_key or os.getenv("OPENAI_API_KEY")
-    api_type = api_type or os.getenv("OPENAI_API_TYPE", "openai")
+    cfg = load_openai_config(config_file)
+
+    key = api_key or cfg.get("api_key") or os.getenv("OPENAI_API_KEY")
+    openai.api_key = key
+
+    api_type = api_type or cfg.get("api_type") or os.getenv("OPENAI_API_TYPE", "openai")
     if api_type == "azure":
         openai.api_type = "azure"
-        openai.api_base = api_base or os.getenv("OPENAI_API_BASE")
-        openai.api_version = api_version or os.getenv("OPENAI_API_VERSION")
+        openai.api_base = api_base or cfg.get("api_base") or os.getenv("OPENAI_API_BASE")
+        openai.api_version = api_version or cfg.get("api_version") or os.getenv("OPENAI_API_VERSION")
     else:
         openai.api_type = "openai"
+
+    global _DEFAULT_MODEL
+    _DEFAULT_MODEL = model or cfg.get("model") or os.getenv("OPENAI_MODEL")
 
 
 def fetch_completion(messages, model=None):
     """Envía las ``messages`` al servicio configurado y devuelve la respuesta."""
-    model = model or os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+    if model is None:
+        model = _DEFAULT_MODEL or os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
     response = openai.ChatCompletion.create(model=model, messages=messages)
     return response["choices"][0]["message"]["content"]
