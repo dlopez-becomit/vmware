@@ -867,7 +867,7 @@ class VMwareHealthCheck:
             'top_disk_free', 'top_iops', 'top_network', 'report_date'
         }
 
-        if template_file == 'template_full.html':
+        if template_file in ('template_full.html', 'template_full_es.html'):
             required |= {
                 'global_state', 'key_risks', 'risks', 'priorities',
                 'recommendations', 'conclusions', 'glossary', 'annexes_data'
@@ -1072,7 +1072,7 @@ class VMwareHealthCheck:
                         security_text=security_text,
                         availability_text=availability_text,
                     )
-                elif template_file == 'template_full.html':
+                elif template_file in ('template_full.html', 'template_full_es.html'):
                     data = self._build_report_data(hosts_data, vm_data, chart)
                     self._validate_report_data(data, template_file)
                     try:
@@ -1221,6 +1221,8 @@ def main():
                         help='use template_a_detailed.html and enable detailed report generation')
     parser.add_argument('--full-html', action='store_true',
                         help='use template_full.html and enable detailed report generation (produces the structured 12-section report)')
+    parser.add_argument('--full-html-es', action='store_true',
+                        help='use template_full_es.html (versi\xc3\xb3n en espa\xc3\xb1ol) and enable detailed report generation')
     args = parser.parse_args()
     if args.extended_html:
         args.template_file = 'template_a_detailed.html'
@@ -1228,6 +1230,10 @@ def main():
             args.detailed_report = args.output
     if args.full_html:
         args.template_file = 'template_full.html'
+        if not args.detailed_report:
+            args.detailed_report = args.output
+    if args.full_html_es:
+        args.template_file = 'template_full_es.html'
         if not args.detailed_report:
             args.detailed_report = args.output
 
