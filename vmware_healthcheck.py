@@ -926,8 +926,40 @@ class VMwareHealthCheck:
                 if template_file == 'template_a.html':
                     data = self._build_report_data(hosts_data, vm_data, chart)
                     html_content = template.render(**data)
+                elif template_file == 'template_a_detailed.html':
+                    data = self._build_report_data(hosts_data, vm_data, chart)
+                    try:
+                        from report_sections import (
+                            performance,
+                            storage,
+                            security,
+                            availability,
+                        )
+
+                        performance_text = performance.generate(data)
+                        storage_text = storage.generate(data)
+                        security_text = security.generate(data)
+                        availability_text = availability.generate(data)
+                    except Exception as exc:  # pragma: no cover - external API
+                        logger.error(
+                            "Failed to generate detailed sections: %s", exc
+                        )
+                        performance_text = getattr(performance, "INTRO", "")
+                        storage_text = getattr(storage, "INTRO", "")
+                        security_text = getattr(security, "INTRO", "")
+                        availability_text = getattr(availability, "INTRO", "")
+
+                    html_content = template.render(
+                        **data,
+                        performance_text=performance_text,
+                        storage_text=storage_text,
+                        security_text=security_text,
+                        availability_text=availability_text,
+                    )
                 else:
-                    html_content = template.render(hosts=hosts_data, vms=vm_data, chart=chart)
+                    html_content = template.render(
+                        hosts=hosts_data, vms=vm_data, chart=chart
+                    )
             except jinja2.TemplateNotFound as exc:
                 logger.error("Template '%s' not found in '%s': %s. Using default template", template_file, template_dir, exc)
                 html_content = self._generate_report_default(hosts_data, vm_data, chart)
