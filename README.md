@@ -72,6 +72,13 @@ Ejecútelo para confirmar que la clave y el endpoint son correctos:
 python check_openai_connection.py
 ```
 Si la conexión es válida se mostrará la respuesta generada por el servicio.
+Para Azure OpenAI existe `check_azure_openai_connection.py`, que acepta las
+variables `AZURE_OPENAI_KEY`, `AZURE_OPENAI_ENDPOINT`,
+`AZURE_OPENAI_VERSION` y `AZURE_OPENAI_DEPLOYMENT` como alias de las variables
+reconocidas por la librería `openai`.
+```bash
+python check_azure_openai_connection.py
+```
 Si también se indica `--output`, el texto se incluirá al final del HTML.
 Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un formato extendido y botones para exportar o imprimir el informe. Para utilizarla basta con indicar el directorio donde se encuentra mediante `--template` y pasar `--template-file template_a.html`.
 
