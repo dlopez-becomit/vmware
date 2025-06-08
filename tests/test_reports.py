@@ -69,6 +69,7 @@ class DummyEnvironment:
 
 jinja2_mod.Environment = DummyEnvironment
 jinja2_mod.FileSystemLoader = DummyLoader
+jinja2_mod.TemplateNotFound = type('TemplateNotFound', (Exception,), {})
 sys.modules.setdefault("jinja2", jinja2_mod)
 
 from vmware_healthcheck import VMwareHealthCheck
@@ -213,6 +214,22 @@ def test_generate_report_html(tmp_path):
     assert 'Rendimiento' in html
     assert 'Seguridad' in html
     assert 'Disponibilidad' in html
+    assert 'AI text' in html
+
+
+def test_generate_report_full_html(tmp_path):
+    output = tmp_path / 'full.html'
+    checker = _checker()
+    with patch.object(checker, '_create_chart', return_value='c'), \
+         patch.object(checker, 'licensing_check', return_value=['key']), \
+         patch.object(checker, 'backup_config_check', return_value=0), \
+         patch.object(checker, 'folder_inconsistencies', return_value=[]), \
+         patch('openai_connector.fetch_completion', return_value='AI text'):
+        checker.generate_report(HOSTS, VMS, str(output), template_file='template_full.html')
+
+    html = output.read_text()
+    assert 'Recomendaciones y Plan de Acción' in html
+    assert 'Glosario' in html
     assert 'AI text' in html
 
 

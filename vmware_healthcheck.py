@@ -1075,7 +1075,113 @@ class VMwareHealthCheck:
                 elif template_file == 'template_full.html':
                     data = self._build_report_data(hosts_data, vm_data, chart)
                     self._validate_report_data(data, template_file)
-                    html_content = template.render(**data)
+                    try:
+                        from report_sections.performance import (
+                            generate as generate_performance, INTRO as INTRO_PERFORMANCE
+                        )
+                        from report_sections.storage import (
+                            generate as generate_storage, INTRO as INTRO_STORAGE
+                        )
+                        from report_sections.security import (
+                            generate as generate_security, INTRO as INTRO_SECURITY
+                        )
+                        from report_sections.availability import (
+                            generate as generate_availability, INTRO as INTRO_AVAILABILITY
+                        )
+                        from report_sections.executive_summary import (
+                            generate as generate_exec, INTRO as INTRO_EXEC
+                        )
+                        from report_sections.recommendations import (
+                            generate as generate_reco, INTRO as INTRO_RECO
+                        )
+                        from report_sections.conclusions import (
+                            generate as generate_conclusions, INTRO as INTRO_CONCLUSIONS
+                        )
+                        from report_sections.glossary import (
+                            generate as generate_glossary, INTRO as INTRO_GLOSSARY
+                        )
+                        from openai_connector import configure_openai
+
+                        configure_openai()
+
+                        def score(name):
+                            for c in data.get('categories', []):
+                                if c.get('name') == name:
+                                    return c.get('score')
+                            return 0
+
+                        perf_info = {
+                            'score': score('Rendimiento'),
+                            'cpu_hosts': data.get('cpu_hosts'),
+                            'ram_hosts': data.get('ram_hosts'),
+                            'top_cpu_ready': data.get('top_cpu_ready'),
+                            'top_ram': data.get('top_ram'),
+                            'top_disk_free': data.get('top_disk_free'),
+                            'top_iops': data.get('top_iops'),
+                            'top_network': data.get('top_network'),
+                        }
+                        storage_info = {
+                            'score': score('Almacenamiento'),
+                            'datastore_usage': data.get('datastore_usage'),
+                            'datastores': data.get('datastores'),
+                        }
+                        security_labels = {
+                            'SSH', 'VMware Tools', 'Snapshots', 'Backups',
+                            'Licensing', 'IPv6', 'DNS'
+                        }
+                        security_info = {
+                            'score': score('Seguridad'),
+                            'indicators': [
+                                i for i in data.get('indicators', [])
+                                if i.get('label') in security_labels
+                            ],
+                        }
+                        avail_labels = {
+                            'HA', 'DRS', 'NTP', 'Updates', 'Round Robin',
+                            'vCPU/pCPU', 'Resource Pools'
+                        }
+                        availability_info = {
+                            'score': score('Disponibilidad'),
+                            'indicators': [
+                                i for i in data.get('indicators', [])
+                                if i.get('label') in avail_labels
+                            ],
+                        }
+
+                        performance_text = generate_performance(perf_info)
+                        storage_text = generate_storage(storage_info)
+                        security_text = generate_security(security_info)
+                        availability_text = generate_availability(availability_info)
+
+                        executive_text = generate_exec(data)
+                        recommendations_text = generate_reco(data)
+                        conclusions_text = generate_conclusions(data)
+                        glossary_text = generate_glossary(data)
+
+                        data['executive_summary'] = executive_text
+                        data['recommendations'] = recommendations_text
+                        data['conclusions'] = conclusions_text
+                        data['glossary'] = glossary_text
+                    except Exception as exc:  # pragma: no cover - external API
+                        logger.error(
+                            "Failed to generate full template sections: %s", exc
+                        )
+                        performance_text = INTRO_PERFORMANCE
+                        storage_text = INTRO_STORAGE
+                        security_text = INTRO_SECURITY
+                        availability_text = INTRO_AVAILABILITY
+                        executive_text = INTRO_EXEC
+                        recommendations_text = INTRO_RECO
+                        conclusions_text = INTRO_CONCLUSIONS
+                        glossary_text = INTRO_GLOSSARY
+
+                    html_content = template.render(
+                        **data,
+                        performance_text=performance_text,
+                        storage_text=storage_text,
+                        security_text=security_text,
+                        availability_text=availability_text,
+                    )
                 else:
                     html_content = template.render(
                         hosts=hosts_data, vms=vm_data, chart=chart
