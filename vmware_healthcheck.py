@@ -1006,8 +1006,10 @@ class VMwareHealthCheck:
                             generate as generate_availability, INTRO as INTRO_AVAILABILITY
                         )
                         from openai_connector import configure_openai
+                        import openai
 
                         configure_openai()
+                        has_key = bool(getattr(openai, "api_key", None))
 
                         def score(name):
                             for c in data.get('categories', []):
@@ -1053,10 +1055,16 @@ class VMwareHealthCheck:
                             ],
                         }
 
-                        performance_text = generate_performance(perf_info)
-                        storage_text = generate_storage(storage_info)
-                        security_text = generate_security(security_info)
-                        availability_text = generate_availability(availability_info)
+                        if has_key:
+                            performance_text = generate_performance(perf_info)
+                            storage_text = generate_storage(storage_info)
+                            security_text = generate_security(security_info)
+                            availability_text = generate_availability(availability_info)
+                        else:
+                            performance_text = INTRO_PERFORMANCE
+                            storage_text = INTRO_STORAGE
+                            security_text = INTRO_SECURITY
+                            availability_text = INTRO_AVAILABILITY
                     except Exception as exc:  # pragma: no cover - external API
                         logger.error(
                             "Failed to generate detailed sections: %s", exc
@@ -1102,8 +1110,10 @@ class VMwareHealthCheck:
                             generate as generate_glossary, INTRO as INTRO_GLOSSARY
                         )
                         from openai_connector import configure_openai
+                        import openai
 
                         configure_openai()
+                        has_key = bool(getattr(openai, "api_key", None))
 
                         def score(name):
                             for c in data.get('categories', []):
@@ -1149,15 +1159,25 @@ class VMwareHealthCheck:
                             ],
                         }
 
-                        performance_text = generate_performance(perf_info)
-                        storage_text = generate_storage(storage_info)
-                        security_text = generate_security(security_info)
-                        availability_text = generate_availability(availability_info)
+                        if has_key:
+                            performance_text = generate_performance(perf_info)
+                            storage_text = generate_storage(storage_info)
+                            security_text = generate_security(security_info)
+                            availability_text = generate_availability(availability_info)
 
-                        executive_text = generate_exec(data)
-                        recommendations_text = generate_reco(data)
-                        conclusions_text = generate_conclusions(data)
-                        glossary_text = generate_glossary(data)
+                            executive_text = generate_exec(data)
+                            recommendations_text = generate_reco(data)
+                            conclusions_text = generate_conclusions(data)
+                            glossary_text = generate_glossary(data)
+                        else:
+                            performance_text = INTRO_PERFORMANCE
+                            storage_text = INTRO_STORAGE
+                            security_text = INTRO_SECURITY
+                            availability_text = INTRO_AVAILABILITY
+                            executive_text = INTRO_EXEC
+                            recommendations_text = INTRO_RECO
+                            conclusions_text = INTRO_CONCLUSIONS
+                            glossary_text = INTRO_GLOSSARY
 
                         data['executive_summary'] = executive_text
                         data['recommendations'] = recommendations_text
