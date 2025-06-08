@@ -1,8 +1,10 @@
-import openai
+"""Helper to request a detailed report from OpenAI or Azure OpenAI."""
+
+from openai_connector import configure_openai, fetch_completion
 
 
 def generate_detailed_report(summary: str, api_key: str, model: str) -> str:
-    """Generates a professional VMware report using OpenAI's ChatGPT API.
+    """Generates a professional VMware report using OpenAI or Azure OpenAI.
 
     Parameters
     ----------
@@ -18,7 +20,7 @@ def generate_detailed_report(summary: str, api_key: str, model: str) -> str:
     str
         Full report text returned by the language model.
     """
-    openai.api_key = api_key
+    configure_openai(api_key=api_key, model=model)
 
     messages = [
         {
@@ -31,8 +33,4 @@ def generate_detailed_report(summary: str, api_key: str, model: str) -> str:
         }
     ]
 
-    response = openai.ChatCompletion.create(
-        model=model,
-        messages=messages
-    )
-    return response["choices"][0]["message"]["content"]
+    return fetch_completion(messages, model)

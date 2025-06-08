@@ -42,5 +42,12 @@ def fetch_completion(messages, model=None):
     """Envía las ``messages`` al servicio configurado y devuelve la respuesta."""
     if model is None:
         model = _DEFAULT_MODEL or os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-    response = openai.ChatCompletion.create(model=model, messages=messages)
+    params = {"messages": messages}
+    # Azure OpenAI uses the ``engine`` or ``deployment_id`` parameter instead of
+    # ``model``. Detect the configured API type to build the correct call.
+    if getattr(openai, "api_type", "openai") == "azure":
+        params["engine"] = model
+    else:
+        params["model"] = model
+    response = openai.ChatCompletion.create(**params)
     return response["choices"][0]["message"]["content"]
