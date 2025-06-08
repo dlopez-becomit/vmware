@@ -233,6 +233,25 @@ def test_generate_report_full_html(tmp_path):
     assert 'AI text' in html
 
 
+def test_generate_full_report_html(tmp_path):
+    output = tmp_path / 'full2.html'
+    checker = _checker()
+    with patch.object(checker, '_create_chart', return_value='c'), \
+         patch.object(checker, 'licensing_check', return_value=['key']), \
+         patch.object(checker, 'backup_config_check', return_value=0), \
+         patch.object(checker, 'folder_inconsistencies', return_value=[]), \
+         patch('openai_connector.fetch_completion', return_value='AI text'):
+        data = checker._build_report_data(HOSTS, VMS, chart='c')
+        checker._validate_report_data(data, template_file='template_full.html')
+        checker.generate_report(HOSTS, VMS, str(output), template_file='template_full.html')
+
+    html = output.read_text()
+    assert 'portada' in html.lower()
+    assert 'Resumen Ejecutivo' in html
+    assert 'Conclusiones' in html
+    assert 'AI text' in html
+
+
 def test_configure_openai_from_file(tmp_path):
     cfg = {
         "api_key": "key",
