@@ -23,19 +23,19 @@ def configure_openai(api_key=None, api_type=None, api_base=None, api_version=Non
     """Configura la librería ``openai`` para usar OpenAI o Azure OpenAI."""
     cfg = load_openai_config(config_file)
 
-    key = api_key or cfg.get("api_key") or os.getenv("OPENAI_API_KEY")
+    key = api_key or os.getenv("OPENAI_API_KEY") or cfg.get("api_key")
     openai.api_key = key
 
-    api_type = api_type or cfg.get("api_type") or os.getenv("OPENAI_API_TYPE", "openai")
+    api_type = api_type or os.getenv("OPENAI_API_TYPE") or cfg.get("api_type", "openai")
     if api_type == "azure":
         openai.api_type = "azure"
-        openai.api_base = api_base or cfg.get("api_base") or os.getenv("OPENAI_API_BASE")
-        openai.api_version = api_version or cfg.get("api_version") or os.getenv("OPENAI_API_VERSION")
+        openai.api_base = api_base or os.getenv("OPENAI_API_BASE") or cfg.get("api_base")
+        openai.api_version = api_version or os.getenv("OPENAI_API_VERSION") or cfg.get("api_version")
     else:
         openai.api_type = "openai"
 
     global _DEFAULT_MODEL
-    _DEFAULT_MODEL = model or cfg.get("model") or os.getenv("OPENAI_MODEL")
+    _DEFAULT_MODEL = model or os.getenv("OPENAI_MODEL") or cfg.get("model")
 
 
 def fetch_completion(messages, model=None):

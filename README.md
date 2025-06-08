@@ -1,6 +1,7 @@
 # VMware Health Check
 
-Este repositorio incluye una herramienta sencilla escrita en Python que se conecta a un vCenter o host ESXi para obtener información básica de seguridad, rendimiento y buenas prácticas.
+Este repositorio incluye una herramienta escrita en Python que recopila información básica de seguridad y rendimiento de un vCenter o host ESXi.
+Genera un informe HTML y, opcionalmente, un texto detallado empleando OpenAI o Azure OpenAI.
 
 ## Requisitos
 
@@ -65,6 +66,12 @@ automáticamente si está presente (o si se indica la ruta en
   "model": "gpt-3.5-turbo"
 }
 ```
+Para verificar la configuración de OpenAI se incluye `check_openai_connection.py`.
+Ejecútelo para confirmar que la clave y el endpoint son correctos:
+```bash
+python check_openai_connection.py
+```
+Si la conexión es válida se mostrará la respuesta generada por el servicio.
 Si también se indica `--output`, el texto se incluirá al final del HTML.
 Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un formato extendido y botones para exportar o imprimir el informe. Para utilizarla basta con indicar el directorio donde se encuentra mediante `--template` y pasar `--template-file template_a.html`.
 
