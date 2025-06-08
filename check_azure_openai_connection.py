@@ -37,7 +37,10 @@ def _apply_azure_env_vars() -> None:
 def main() -> None:
     """Muestra si es posible obtener una respuesta desde Azure OpenAI."""
     _apply_azure_env_vars()
-    configure_openai(verbose=True)
+    cfg_file = os.getenv("OPENAI_CONFIG_FILE")
+    if not cfg_file and os.path.isfile("openai_config_azure.json"):
+        cfg_file = "openai_config_azure.json"
+    configure_openai(config_file=cfg_file, verbose=True)
     try:
         text = fetch_completion([
             {"role": "user", "content": "Decir hola"}
