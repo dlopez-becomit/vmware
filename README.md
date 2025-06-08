@@ -57,12 +57,19 @@ Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un form
 
 También se ha añadido `template_a_detailed.html`, una versión ampliada que incorpora una sección **Análisis Detallado** con cuatro bloques de texto (Rendimiento, Almacenamiento, Seguridad y Disponibilidad). Dichos textos se generan con IA si se indica la opción `--detailed-report`.
 
+De forma simplificada puede utilizarse `--extended-html`, que aplica automáticamente esta plantilla y habilita el informe detallado cuando se indica `--output`.
+
 Para obtener un informe extendido en HTML utilice el nombre de esta plantilla y especifique dónde guardar el texto generado:
 
 ```bash
 python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> \
   --output informe.html --template . --template-file template_a_detailed.html \
   --detailed-report report.txt
+```
+O bien utilizando la nueva opción:
+```bash
+python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> \
+  --output informe.html --template . --extended-html
 ```
 
 Recuerde exportar `OPENAI_API_KEY` y, en el caso de Azure OpenAI, `OPENAI_API_TYPE`, `OPENAI_API_BASE` y `OPENAI_API_VERSION` para que se puedan crear estos textos automáticamente.

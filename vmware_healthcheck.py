@@ -1060,7 +1060,13 @@ def main():
     parser.add_argument('--detailed-report', metavar='FILE',
                         help='save an extended text report to FILE. If --output '
                              'is given, the text will be embedded in the HTML')
+    parser.add_argument('--extended-html', action='store_true',
+                        help='use template_a_detailed.html and enable detailed report generation')
     args = parser.parse_args()
+    if args.extended_html:
+        args.template_file = 'template_a_detailed.html'
+        if not args.detailed_report:
+            args.detailed_report = args.output
 
     checker = VMwareHealthCheck(args.host, args.user, args.password)
     try:
