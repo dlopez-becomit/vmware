@@ -55,6 +55,18 @@ export OPENAI_API_KEY=<clave>
 Si también se indica `--output`, el texto se incluirá al final del HTML.
 Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un formato extendido y botones para exportar o imprimir el informe. Para utilizarla basta con indicar el directorio donde se encuentra mediante `--template` y pasar `--template-file template_a.html`.
 
+También se ha añadido `template_a_detailed.html`, una versión ampliada que incorpora una sección **Análisis Detallado** con cuatro bloques de texto (Rendimiento, Almacenamiento, Seguridad y Disponibilidad). Dichos textos se generan con IA si se indica la opción `--detailed-report`.
+
+Para obtener un informe extendido en HTML utilice el nombre de esta plantilla y especifique dónde guardar el texto generado:
+
+```bash
+python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> \
+  --output informe.html --template . --template-file template_a_detailed.html \
+  --detailed-report report.txt
+```
+
+Recuerde exportar `OPENAI_API_KEY` y, en el caso de Azure OpenAI, `OPENAI_API_TYPE`, `OPENAI_API_BASE` y `OPENAI_API_VERSION` para que se puedan crear estos textos automáticamente.
+
 Las comprobaciones se han ampliado para registrar el tiempo de actividad de cada host, detectar si el clúster tiene activados HA y DRS, y para cada VM revisar la presencia de instantáneas y el estado de VMware Tools.
 
 Adicionalmente, la versión actual realiza comprobaciones básicas de:
@@ -100,4 +112,11 @@ La función `generate_detailed_report` utiliza un prompt muy sencillo para crear
     {"role": "user", "content": "A partir del siguiente resumen genera un informe completo:\n<resumen>"}
 ]
 ```
+
+Los módulos en `report_sections/` generan el texto de cada área. Cada uno arranca con una breve introducción y solicita a la IA que elabore un análisis adicional:
+
+- **Rendimiento** analiza hosts y VMs usando datos de CPU y RAM.
+- **Almacenamiento** revisa el uso de datastores y espacio libre.
+- **Seguridad** evalúa puntos como snapshots, backups o licencias.
+- **Disponibilidad** cubre HA, DRS y otros elementos de resiliencia.
 
