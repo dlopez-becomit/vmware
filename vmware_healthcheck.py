@@ -817,6 +817,20 @@ class VMwareHealthCheck:
             'chart': chart,
         }
 
+    def _validate_report_data(self, data):
+        """Verify that report data has all fields required by the templates."""
+        required = {
+            'health_score', 'health_state', 'health_message', 'uptime', 'alerts',
+            'sla', 'hosts', 'vms', 'datastores_count', 'networks_count',
+            'categories', 'cpu_hosts', 'ram_hosts', 'datastore_usage',
+            'indicators', 'top_cpu_ready', 'top_ram', 'datastores',
+            'top_disk_free', 'top_iops', 'top_network', 'report_date'
+        }
+        missing = [k for k in required if k not in data]
+        if missing:
+            logger.error("Report data missing keys: %s", ", ".join(missing))
+            raise ValueError(f"Missing keys in report data: {', '.join(missing)}")
+
     def build_text_summary(self, hosts_data, summary):
         """Build a plain text summary similar to ``template_a.html``."""
         # Aggregate VM list from hosts
@@ -925,9 +939,11 @@ class VMwareHealthCheck:
                 template = env.get_template(template_file)
                 if template_file == 'template_a.html':
                     data = self._build_report_data(hosts_data, vm_data, chart)
+                    self._validate_report_data(data)
                     html_content = template.render(**data)
                 elif template_file == 'template_a_detailed.html':
                     data = self._build_report_data(hosts_data, vm_data, chart)
+                    self._validate_report_data(data)
                     try:
                         from report_sections.performance import (
                             generate as generate_performance, INTRO as INTRO_PERFORMANCE
