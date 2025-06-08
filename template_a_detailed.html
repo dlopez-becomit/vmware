@@ -48,6 +48,12 @@
     .quick-links { margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; }
     .quick-links a { background: #000; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: 700; transition: background 0.3s ease; }
     .quick-links a:hover { background: #333; }
+
+    /* ÍNDICE */
+    .toc { margin-bottom: 30px; }
+    .toc ul { list-style: none; padding-left: 0; }
+    .toc li { margin: 4px 0; }
+    .toc a { text-decoration: underline; color: #0077cc; }
     
     /* SECCIÓN CATEGORÍAS */
     .categories-section { margin-bottom: 40px; }
@@ -184,9 +190,22 @@
       <img src="https://serviit.com/wp-content/uploads/2024/12/Logo_negro_fondo_blanco-200x77.png" alt="Logo Serviit">
     </div>
   </header>
+
+  <!-- ÍNDICE CLICABLE -->
+  <nav class="container toc">
+    <h2>Índice</h2>
+    <ul>
+      <li><a href="#score">Visión General</a></li>
+      <li><a href="#categorias">Resumen de Categorías</a></li>
+      <li><a href="#graficos">Gráficos</a></li>
+      <li><a href="#indicadores">Estado de Componentes</a></li>
+      <li><a href="#top10">Top 10 Listados</a></li>
+      <li><a href="#analisis-detallado">Análisis Detallado</a></li>
+    </ul>
+  </nav>
   
   <!-- SECCIÓN SCORE -->
-  <section class="container score-section">
+  <section id="score" class="container score-section">
     <div class="score-wrapper">
       <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 10px;">Health Score</div>
       <div class="score-text">{{ health_score }}</div>
@@ -212,7 +231,7 @@
   </section>
   
   <!-- SECCIÓN CATEGORÍAS -->
-  <section class="container categories-section">
+  <section id="categorias" class="container categories-section">
     <h2><i class="fa-solid fa-chart-pie"></i> Resumen de Categorías</h2>
     <div class="categories-grid">
       {% for cat in categories %}
@@ -226,7 +245,7 @@
   </section>
   
   <!-- SECCIÓN GRÁFICOS: CPU, RAM Y DATASTORES -->
-  <section class="container graphs-container">
+  <section id="graficos" class="container graphs-container">
     <!-- Gráfico CPU -->
     <div class="graph-section">
       <h3><i class="fa-solid fa-microchip"></i> Uso de CPU (%) por Servidor</h3>
@@ -266,7 +285,7 @@
   </section>
   
   <!-- SECCIÓN ESTADO DE COMPONENTES CLAVE -->
-  <section class="container indicator-section">
+  <section id="indicadores" class="container indicator-section">
     <h2><i class="fa-solid fa-clipboard-check"></i> Estado de Componentes Clave</h2>
     <div class="indicator-grid">
       {% for ind in indicators %}
@@ -280,7 +299,7 @@
   </section>
   
   <!-- SECCIÓN TOP 10 LISTADOS -->
-  <section class="container top-list">
+  <section id="top10" class="container top-list">
     <h2><i class="fa-solid fa-list-ol"></i> Top 10 Listados</h2>
     <div class="table-grid">
       <!-- Card 1: TOP 10 CPU Ready Time (ms) -->
@@ -401,7 +420,7 @@
   </section>
 
   <!-- SECCIÓN ANÁLISIS DETALLADO -->
-  <section class="container details-section">
+  <section id="analisis-detallado" class="container details-section">
     <h2><i class="fa-solid fa-file-lines"></i> Análisis Detallado</h2>
     <div class="details-grid">
       <div class="detail-card">
