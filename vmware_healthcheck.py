@@ -1365,10 +1365,20 @@ def main():
         print('Health scores:', scores, 'overall:', overall_score)
         detailed_text = None
         if args.detailed_report:
+            apply_azure_env_vars()
             api_key = os.getenv('OPENAI_API_KEY')
             model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+            if not api_key and args.openai_config:
+                try:
+                    import json
+                    with open(args.openai_config, encoding='utf-8') as cfg_file:
+                        cfg = json.load(cfg_file)
+                    api_key = cfg.get('api_key', api_key)
+                    model = cfg.get('model', model)
+                except Exception as exc:  # pragma: no cover - config issues
+                    logger.error('Could not load %s: %s', args.openai_config, exc)
             if not api_key:
-                logger.error('OPENAI_API_KEY not set; skipping detailed report')
+                logger.error('OpenAI API key not configured; skipping detailed report')
             else:
                 try:
                     summary_text = checker.build_text_summary(hosts_data, summary)
