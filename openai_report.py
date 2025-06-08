@@ -3,7 +3,11 @@
 from openai_connector import configure_openai, fetch_completion
 
 
-def generate_detailed_report(summary: str, api_key: str, model: str) -> str:
+def generate_detailed_report(summary: str, api_key: str, model: str,
+                             api_type: str | None = None,
+                             api_base: str | None = None,
+                             api_version: str | None = None,
+                             config_file: str | None = None) -> str:
     """Generates a professional VMware report using OpenAI or Azure OpenAI.
 
     Parameters
@@ -13,14 +17,30 @@ def generate_detailed_report(summary: str, api_key: str, model: str) -> str:
     api_key : str
         OpenAI API key.
     model : str
-        Model name to use (e.g. 'gpt-3.5-turbo' or 'gpt-4').
+        Model name or deployment to use.
+    api_type : str, optional
+        ``"openai"`` or ``"azure"``. If ``None`` the value is taken from the
+        environment or configuration file.
+    api_base : str, optional
+        Azure OpenAI endpoint URL. Ignored for the ``openai`` type.
+    api_version : str, optional
+        Azure OpenAI API version.
+    config_file : str, optional
+        Path to a JSON file with the configuration parameters.
 
     Returns
     -------
     str
         Full report text returned by the language model.
     """
-    configure_openai(api_key=api_key, model=model)
+    configure_openai(
+        api_key=api_key,
+        api_type=api_type,
+        api_base=api_base,
+        api_version=api_version,
+        model=model,
+        config_file=config_file,
+    )
 
     messages = [
         {

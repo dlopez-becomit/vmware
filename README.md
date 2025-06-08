@@ -78,6 +78,11 @@ ejemplo sería:
 }
 ```
 Este repositorio incluye `openai_config_azure.json` como referencia.
+Si se desea escoger explícitamente el tipo de servicio al ejecutar
+`vmware_healthcheck.py`, puede indicarse mediante la opción
+`--api-type`, que acepta los valores `openai` o `azure`. También es
+posible especificar un archivo de configuración distinto con
+`--openai-config <archivo>`.
 Para verificar la configuración de OpenAI se incluye `check_openai_connection.py`.
 Ejecútelo para confirmar que la clave y el endpoint son correctos:
 ```bash
