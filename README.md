@@ -85,6 +85,13 @@ python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password
   --output informe.html --template . --extended-html
 ```
 
+Asimismo se incluye `template_full.html`, una versión con 12 secciones estructuradas.
+Puede emplearse fácilmente con:
+```bash
+python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> \
+  --output informe.html --template . --full-html
+```
+
 El archivo `template_a_detailed.html` incluye ahora un pequeño índice clicable
 para navegar por las secciones principales del informe. Una vez generado el
 HTML puede convertirse en PDF con vínculos internos utilizando el script

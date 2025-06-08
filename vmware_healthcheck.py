@@ -1219,9 +1219,15 @@ def main():
                              'is given, the text will be embedded in the HTML')
     parser.add_argument('--extended-html', action='store_true',
                         help='use template_a_detailed.html and enable detailed report generation')
+    parser.add_argument('--full-html', action='store_true',
+                        help='use template_full.html and enable detailed report generation (produces the structured 12-section report)')
     args = parser.parse_args()
     if args.extended_html:
         args.template_file = 'template_a_detailed.html'
+        if not args.detailed_report:
+            args.detailed_report = args.output
+    if args.full_html:
+        args.template_file = 'template_full.html'
         if not args.detailed_report:
             args.detailed_report = args.output
 
