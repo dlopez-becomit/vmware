@@ -92,6 +92,11 @@ Puede emplearse fácilmente con:
 python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> \
   --output informe.html --template . --full-html
 ```
+Para obtener el mismo informe completamente en español puede utilizar `template_full_es.html` y la opción `--full-html-es`:
+```bash
+python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> \
+  --output informe.html --template . --full-html-es
+```
 Las áreas de recomendaciones, conclusiones y glosario se generan con IA, por lo que debe configurarse OpenAI (variables de entorno o `openai_config.json`).
 
 El archivo `template_a_detailed.html` incluye ahora un pequeño índice clicable

@@ -252,6 +252,20 @@ def test_generate_full_report_html(tmp_path):
     assert 'AI text' in html
 
 
+def test_generate_spanish_report_html(tmp_path):
+    output = tmp_path / 'full_es.html'
+    checker = _checker()
+    with patch.object(checker, '_create_chart', return_value='c'), \
+         patch.object(checker, 'licensing_check', return_value=['key']), \
+         patch.object(checker, 'backup_config_check', return_value=0), \
+         patch.object(checker, 'folder_inconsistencies', return_value=[]), \
+         patch('openai_connector.fetch_completion', return_value='AI text'):
+        checker.generate_report(HOSTS, VMS, str(output), template_file='template_full_es.html')
+
+    html = output.read_text()
+    assert 'Glosario de Términos Técnicos' in html
+
+
 def test_configure_openai_from_file(tmp_path):
     cfg = {
         "api_key": "key",

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe de Healthcheck del Entorno Virtualizado</title>
+    <style>
+        body { font-family: Calibri, Arial, sans-serif; background: #fafbfc; color: #23272c; margin: 0; padding: 0; }
+        .container { width: 85%; margin: 0 auto; padding: 40px 0; }
+        .portada { text-align: center; margin-top: 100px; }
+        .titulo { font-size: 2.8em; color: #D15504; margin-bottom: 0.2em; }
+        .subtitulo { font-size: 1.4em; color: #23272c; margin-bottom: 2em; }
+        .info-portada { margin: 30px auto 0 auto; font-size: 1.1em; }
+        .indice { margin: 60px 0 50px 0; }
+        .indice h2 { color: #D15504; font-size: 1.7em; }
+        .indice ul { list-style: none; padding-left: 0; }
+        .indice li { margin-bottom: 0.7em; }
+        .section { margin-bottom: 48px; }
+        .section h2, .section h3 { color: #D15504; }
+        .section h2 { border-bottom: 1.5px solid #e7e8ec; padding-bottom: 7px; margin-bottom: 16px; }
+        .section h3 { margin-top: 24px; }
+        .intro-apartado { background: #e8f5fc; border-left: 5px solid #2196f3; padding: 13px 22px; margin: 20px 0 22px 0; font-size: 1.02em; }
+        .tabla-componentes { border-collapse: collapse; width: 100%; margin-top: 18px; }
+        .tabla-componentes th, .tabla-componentes td { border: 1px solid #e7e8ec; padding: 9px 13px; text-align: left; }
+        .tabla-componentes th { background-color: #f6e9da; color: #D15504; }
+        .estado-critical { color: #fff; background: #c0392b; padding: 3px 11px; border-radius: 9px; font-weight: bold; }
+        .estado-warning { color: #fff; background: #e67e22; padding: 3px 11px; border-radius: 9px; font-weight: bold; }
+        .estado-ok { color: #fff; background: #229954; padding: 3px 11px; border-radius: 9px; font-weight: bold; }
+        .riesgo { color: #fff; background: #c0392b; font-weight: bold; border-radius: 6px; padding: 2px 8px; }
+        .nota { background: #f8e8c1; border-left: 4px solid #D15504; padding: 10px 18px; margin: 22px 0; font-size: 0.97em; }
+        .glosario, .anexos { background: #f1f3f5; padding: 17px 20px; border-radius: 9px; }
+        .anexo-titulo { margin-top: 16px; }
+        .destacado { background: #ffd6b0; color: #c0392b; padding: 3px 7px; border-radius: 5px; font-weight: bold; }
+        .grafico, .tabla { margin: 15px 0 25px 0; }
+        .icono { font-size: 1.1em; margin-right: 6px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 1. Portada -->
+        <div class="portada">
+            <div class="titulo">Informe de Healthcheck del Entorno Virtualizado</div>
+            <div class="subtitulo">Fecha: {{ report_date }}</div>
+            <div class="info-portada">
+                Auditor: {{ author|default('') }}<br>
+                Alcance: Evaluación integral de la salud y riesgos del entorno virtualizado<br>
+            </div>
+        </div>
+
+        <!-- 2. Tabla de Contenidos -->
+        <div class="indice">
+            <h2>Índice</h2>
+            <ul>
+                <li>1. Portada</li>
+                <li>2. Tabla de Contenidos</li>
+                <li>3. Resumen Ejecutivo</li>
+                <li>4. Introducción</li>
+                <li>5. Resumen General del Entorno</li>
+                <li>6. Análisis por Categorías<ul><li>6.1. Rendimiento</li><li>6.2. Almacenamiento</li><li>6.3. Seguridad</li><li>6.4. Disponibilidad</li></ul></li>
+                <li>7. Estado de Componentes Clave</li>
+                <li>8. Análisis Detallado de TOP 10<ul><li>8.1. CPU Ready</li><li>8.2. RAM</li><li>8.3. Espacio Libre</li><li>8.4. IOPS</li><li>8.5. Red</li></ul></li>
+                <li>9. Recomendaciones y Plan de Acción</li>
+                <li>10. Conclusiones</li>
+                <li>11. Glosario de Términos Técnicos</li>
+                <li>12. Anexos Técnicos</li>
+            </ul>
+        </div>
+
+        <!-- 3. Resumen Ejecutivo -->
+        <div class="section">
+            <h2>3. Resumen Ejecutivo</h2>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> El resumen ejecutivo proporciona una visión rápida y global del estado del entorno virtualizado, destacando los riesgos principales y prioridades de actuación.
+                <br><b>Resultados esperados:</b> Conocer el Health Score global, riesgos prioritarios y acciones recomendadas.
+            </div>
+            <p><span class="destacado">Health Score Global:</span> <b>{{ health_score }}</b> <span class="estado-{{ health_state }}">{{ health_message }}</span></p>
+            <ul>
+                <li>Principales riesgos: <span class="riesgo">{{ key_risks }}</span></li>
+                <li>Prioridades: {{ priorities|join(', ') }}</li>
+            </ul>
+        </div>
+
+        <!-- 4. Introducción -->
+        <div class="section">
+            <h2>4. Introducción</h2>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Describe el propósito, alcance y metodología aplicada en este informe Healthcheck.
+                <br><b>Resultados esperados:</b> Claridad sobre el contexto, herramientas y criterios de evaluación.
+            </div>
+            <p><b>Objetivo:</b> Evaluar la salud, riesgos y oportunidades de mejora del entorno VMware.</p>
+            <p><b>Metodología:</b> Análisis automatizado y auditoría manual de configuraciones, métricas y alertas.</p>
+            <p><b>Alcance:</b> Hosts, VMs, datastores, redes y servicios críticos del entorno virtual.</p>
+        </div>
+
+        <!-- 5. Resumen General del Entorno -->
+        <div class="section">
+            <h2>5. Resumen General del Entorno</h2>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Ofrece un inventario inicial para entender el tamaño y complejidad del entorno.
+                <br><b>Resultados esperados:</b> Visión consolidada de activos, SLA, uptime y alertas.
+            </div>
+            <ul>
+                <li><b>Hosts:</b> {{ hosts|length }}</li><li><b>VMs:</b> {{ vms|length }}</li><li><b>Datastores:</b> {{ datastores_count }}</li>
+                <li><b>Redes:</b> {{ networks_count }}</li><li><b>SLA:</b> {{ sla }}</li><li><b>Uptime:</b> {{ uptime }}</li>
+                <li><b>Alertas:</b> {{ alerts }}</li>
+            </ul>
+        </div>
+
+        <!-- 6. Análisis por Categorías -->
+        <div class="section">
+            <h2>6. Análisis por Categorías</h2>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Divide el informe en áreas críticas para evaluar individualmente rendimiento, almacenamiento, seguridad y disponibilidad.
+                <br><b>Resultados esperados:</b> Identificación de problemas específicos y acciones detalladas.
+            </div>
+            {% set perf = categories|selectattr('name','equalto','Rendimiento')|first %}
+            {% set store = categories|selectattr('name','equalto','Almacenamiento')|first %}
+            {% set sec = categories|selectattr('name','equalto','Seguridad')|first %}
+            {% set avail = categories|selectattr('name','equalto','Disponibilidad')|first %}
+            <h3>6.1. Rendimiento</h3>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Métricas como CPU Ready y Ballooning revelan contención de recursos.
+                <br><b>Resultados esperados:</b> Recomendaciones de ajuste de CPU/MEM y migraciones.
+            </div>
+            <p>Estado: <span class="estado-{{ perf.status }}">{{ perf.status|capitalize }} ({{ perf.score }}%)</span></p>
+            <div class="tabla"></div>
+            <div class="grafico"></div>
+            <div class="nota">Top 10 VMs por CPU Ready y consumo RAM.</div>
+
+            <h3>6.2. Almacenamiento</h3>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Verifica capacidad, IOPS y snapshots para prevenir cuellos de botella y pérdida de datos.
+                <br><b>Resultados esperados:</b> Propuestas de limpieza de snapshots y redistribución de carga.
+            </div>
+            <p>Estado: <span class="estado-{{ store.status }}">{{ store.status|capitalize }} ({{ store.score }}%)</span></p>
+            <div class="tabla"></div>
+            <div class="grafico"></div>
+            <ul>
+                {% for ds in datastore_usage[:2] %}
+                <li>{{ ds.name }}: {{ ds.percent }}% usado</li>
+                {% endfor %}
+                <li>Snapshots pendientes</li><li>VMs zombie detectadas</li>
+            </ul>
+
+            <h3>6.3. Seguridad</h3>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Revisa servicios críticos y hardening para reducir riesgos de ataque.
+                <br><b>Resultados esperados:</b> Lista de controles faltantes y configuración recomendada.
+            </div>
+            <p>Estado: <span class="estado-{{ sec.status }}">{{ sec.status|capitalize }} ({{ sec.score }}%)</span></p>
+            <ul>
+                <li>SSH sin restricciones</li>
+                <li>Licenciamiento no auditado</li>
+                <li>Backups/NTP/DNS no conformes</li>
+            </ul>
+            <div class="nota">Implementar firewall, roles y políticas de acceso.</div>
+
+            <h3>6.4. Disponibilidad</h3>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Garantiza continuidad con HA, DRS y respaldos.
+                <br><b>Resultados esperados:</b> Plan de alta disponibilidad y recuperación ante desastres.
+            </div>
+            <p>Estado: <span class="estado-{{ avail.status }}">{{ avail.status|capitalize }} ({{ avail.score }}%)</span></p>
+            <ul>
+                <li>HA y DRS desactivados</li>
+                <li>Resource Pools inexistentes</li>
+                <li>Snapshots en Warning</li>
+            </ul>
+        </div>
+
+        <!-- 7. Estado de Componentes Clave -->
+        <div class="section">
+            <h2>7. Estado de Componentes Clave</h2>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Muestra estado de elementos críticos y su impacto.
+                <br><b>Resultados esperados:</b> Priorizar correcciones en componentes en rojo.
+            </div>
+            <table class="tabla-componentes">
+                <tr><th>Componente</th><th>Descripción</th><th>Estado</th><th>Impacto</th></tr>
+                <tr><td>HA</td><td>Alta disponibilidad</td><td><span class="estado-critical">Disabled</span></td><td>Caída total ante fallo</td></tr>
+                <tr><td>DRS</td><td>Distribución recursos</td><td><span class="estado-critical">Disabled</span></td><td>Desbalanceo de carga</td></tr>
+                <tr><td>Snapshots</td><td>Instantáneas</td><td><span class="estado-warning">Warning</span></td><td>Consumo espacio</td></tr>
+                <tr><td>VMware Tools</td><td>Integración guest</td><td><span class="estado-warning">Warning</span></td><td>Visibilidad reducida</td></tr>
+                <tr><td>SSH</td><td>Acceso remoto</td><td><span class="estado-warning">Warning</span></td><td>Acceso no controlado</td></tr>
+                <tr><td>Resource Pools</td><td>Segmentación</td><td><span class="estado-critical">None</span></td><td>Sin control recursos</td></tr>
+            </table>
+        </div>
+
+        <!-- 8. Análisis Detallado de TOP 10 -->
+        <div class="section">
+            <h2>8. Análisis Detallado de TOP 10</h2>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Identifica los 10 elementos más críticos para focalizar esfuerzos.
+                <br><b>Resultados esperados:</b> Acciones específicas por cada TOP 10.
+            </div>
+            <h3>8.1. TOP 10 CPU Ready</h3>
+            <div class="tabla"></div>
+            <div class="grafico"></div>
+            <h3>8.2. TOP 10 RAM</h3>
+            <div class="tabla"></div>
+            <div class="grafico"></div>
+            <h3>8.3. TOP 10 Espacio Libre</h3>
+            <div class="tabla"></div>
+            <div class="grafico"></div>
+            <h3>8.4. TOP 10 IOPS</h3>
+            <div class="tabla"></div>
+            <div class="grafico"></div>
+            <h3>8.5. TOP 10 Uso de Red</h3>
+            <div class="tabla"></div>
+            <div class="grafico"></div>
+        </div>
+
+        <!-- 9. Recomendaciones y Plan de Acción -->
+        <div class="section">
+            <h2>9. Recomendaciones y Plan de Acción</h2>
+            <ul>
+                <li><b>Rendimiento:</b> Ajustar CPU/MEM, reasignar VMs, revisar configuración de recursos.</li>
+                <li><b>Almacenamiento:</b> Consolidar snapshots, eliminar VMs zombie, redistribuir datastores.</li>
+                <li><b>Seguridad:</b> Implementar políticas de acceso SSH, auditar licencias, configurar backups seguros.</li>
+                <li><b>Disponibilidad:</b> Activar HA/DRS, crear resource pools, validar plan DR.</li>
+            </ul>
+        </div>
+
+        <!-- 10. Conclusiones -->
+        <div class="section">
+            <h2>10. Conclusiones</h2>
+            <div class="intro-apartado">
+                <b>¿Por qué es útil?</b> Resume la valoración final y subraya consecuencias de no actuar.
+                <br><b>Resultados esperados:</b> Compromiso de seguimiento y fechas clave.
+            </div>
+            <p>El entorno presenta riesgos críticos que pueden derivar en caídas y pérdida de datos. Se recomienda priorizar acciones descritas y programar nueva revisión en 3 meses.</p>
+        </div>
+
+        <!-- 11. Glosario de Términos Técnicos -->
+        <div class="section glosario">
+            <h2>11. Glosario de Términos Técnicos</h2>
+            <ul>
+                <li><b>CPU Ready:</b> Tiempo que espera una VM para ejecutar en CPU.</li>
+                <li><b>Ballooning:</b> Técnica para gestionar memoria en VMs.</li>
+                <li><b>HA:</b> Alta Disponibilidad.</li>
+                <li><b>DRS:</b> Distribución dinámica de recursos.</li>
+                <li><b>Snapshot:</b> Instantánea del estado de una VM.</li>
+            </ul>
+        </div>
+
+        <!-- 12. Anexos Técnicos -->
+        <div class="section anexos">
+            <h2>12. Anexos Técnicos</h2>
+            <div class="anexo-titulo"><b>Listado completo de alertas</b></div>
+            <div class="tabla"></div>
+            <div class="anexo-titulo"><b>Detalles de configuración</b></div>
+            <div class="tabla"></div>
+            <div class="anexo-titulo"><b>Logs y gráficos detallados</b></div>
+            <div class="tabla"></div>
+            <div class="anexo-titulo"><b>Metodología de recolección de datos</b></div>
+            <p>[Describir herramientas, scripts y periodos de análisis]</p>
+        </div>
+    </div>
+</body>
+</html>
