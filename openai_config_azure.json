@@ -1,0 +1,7 @@
+{
+  "api_key": "<clave>",
+  "api_type": "azure",
+  "api_base": "https://<tu-recurso>.openai.azure.com/",
+  "api_version": "2023-05-15",
+  "model": "<deployment>"
+}

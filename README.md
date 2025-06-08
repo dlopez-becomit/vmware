@@ -66,6 +66,18 @@ automáticamente si está presente (o si se indica la ruta en
   "model": "gpt-3.5-turbo"
 }
 ```
+Para Azure también puede almacenarse la configuración en este archivo. Un
+ejemplo sería:
+```json
+{
+  "api_key": "<clave>",
+  "api_type": "azure",
+  "api_base": "https://<tu-recurso>.openai.azure.com/",
+  "api_version": "2023-05-15",
+  "model": "<deployment>"
+}
+```
+Este repositorio incluye `openai_config_azure.json` como referencia.
 Para verificar la configuración de OpenAI se incluye `check_openai_connection.py`.
 Ejecútelo para confirmar que la clave y el endpoint son correctos:
 ```bash
