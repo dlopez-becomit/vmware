@@ -311,3 +311,17 @@ def test_configure_openai_env_overrides_file(monkeypatch, tmp_path):
     assert openai_mod.api_type == "azure"
     assert openai_connector._DEFAULT_MODEL == "env-model"
 
+
+def test_configure_openai_verbose_logs(monkeypatch, capsys):
+    monkeypatch.setenv("OPENAI_CONFIG_FILE", "missing.json")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    import importlib
+    import openai_connector
+    importlib.reload(openai_connector)
+
+    openai_connector.configure_openai(verbose=True)
+    captured = capsys.readouterr().out
+    assert "missing.json" in captured
+    assert "no definido" in captured.lower()
+

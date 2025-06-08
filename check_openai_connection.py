@@ -6,7 +6,7 @@ from openai_connector import configure_openai, fetch_completion
 
 def main() -> None:
     """Muestra si es posible obtener una respuesta."""
-    configure_openai()
+    configure_openai(verbose=True)
     try:
         text = fetch_completion([
             {"role": "user", "content": "Decir hola"}

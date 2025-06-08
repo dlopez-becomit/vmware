@@ -7,35 +7,55 @@ import openai
 _DEFAULT_MODEL = None
 
 
-def load_openai_config(path=None):
+def load_openai_config(path=None, verbose=False):
     """Carga la configuración de OpenAI desde un archivo JSON."""
     config_path = path or os.getenv("OPENAI_CONFIG_FILE", "openai_config.json")
     if not os.path.isfile(config_path):
+        if verbose:
+            print(f"Archivo de configuración {config_path} no encontrado")
         return {}
     try:
         with open(config_path, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
+            cfg = json.load(f)
+    except Exception as exc:
+        if verbose:
+            print(f"No se pudo cargar {config_path}: {exc}")
         return {}
+    if verbose:
+        print(f"Configuración cargada desde {config_path}")
+    return cfg
 
 
-def configure_openai(api_key=None, api_type=None, api_base=None, api_version=None, model=None, config_file=None):
+def configure_openai(api_key=None, api_type=None, api_base=None, api_version=None,
+                     model=None, config_file=None, verbose=False):
     """Configura la librería ``openai`` para usar OpenAI o Azure OpenAI."""
-    cfg = load_openai_config(config_file)
+    cfg = load_openai_config(config_file, verbose=verbose)
 
     key = api_key or os.getenv("OPENAI_API_KEY") or cfg.get("api_key")
     openai.api_key = key
+    if verbose and not key:
+        print("Advertencia: OPENAI_API_KEY no definido")
 
     api_type = api_type or os.getenv("OPENAI_API_TYPE") or cfg.get("api_type", "openai")
     if api_type == "azure":
         openai.api_type = "azure"
         openai.api_base = api_base or os.getenv("OPENAI_API_BASE") or cfg.get("api_base")
         openai.api_version = api_version or os.getenv("OPENAI_API_VERSION") or cfg.get("api_version")
+        if verbose and (not openai.api_base or not openai.api_version):
+            print("Advertencia: OPENAI_API_BASE o OPENAI_API_VERSION no definidos para Azure")
     else:
         openai.api_type = "openai"
 
     global _DEFAULT_MODEL
     _DEFAULT_MODEL = model or os.getenv("OPENAI_MODEL") or cfg.get("model")
+    if verbose:
+        print(f"API type: {openai.api_type}")
+        if openai.api_type == "azure":
+            print(f"Endpoint: {openai.api_base}")
+            print(f"Versión: {openai.api_version}")
+            print(f"Deployment/Modelo: {_DEFAULT_MODEL}")
+        else:
+            print(f"Modelo: {_DEFAULT_MODEL}")
 
 
 def fetch_completion(messages, model=None):
