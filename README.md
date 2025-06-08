@@ -85,6 +85,15 @@ python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password
   --output informe.html --template . --extended-html
 ```
 
+El archivo `template_a_detailed.html` incluye ahora un pequeño índice clicable
+para navegar por las secciones principales del informe. Una vez generado el
+HTML puede convertirse en PDF con vínculos internos utilizando el script
+`html_to_pdf.py`:
+
+```bash
+python html_to_pdf.py informe.html reporte.pdf
+```
+
 Recuerde exportar `OPENAI_API_KEY` y, en el caso de Azure OpenAI, `OPENAI_API_TYPE`, `OPENAI_API_BASE` y `OPENAI_API_VERSION` para que se puedan crear estos textos automáticamente.
 
 Las comprobaciones se han ampliado para registrar el tiempo de actividad de cada host, detectar si el clúster tiene activados HA y DRS, y para cada VM revisar la presencia de instantáneas y el estado de VMware Tools.
