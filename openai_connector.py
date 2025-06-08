@@ -98,10 +98,14 @@ def fetch_completion(messages, model=None):
     if model is None:
         model = _DEFAULT_MODEL or os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
     params = {"messages": messages}
-    # Azure OpenAI uses the ``engine`` or ``deployment_id`` parameter instead of
-    # ``model``. Detect the configured API type to build the correct call.
-    if getattr(openai, "api_type", "openai") == "azure":
-        params["engine"] = model
+    api_type = getattr(openai, "api_type", "openai")
+    if api_type == "azure":
+        version = getattr(openai, "__version__", "0")
+        if version.startswith("0."):
+            params["engine"] = model
+        else:
+            # openai>=1 uses ``model`` even for Azure
+            params["model"] = model
     else:
         params["model"] = model
     response = openai.ChatCompletion.create(**params)
