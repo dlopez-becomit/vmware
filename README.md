@@ -85,12 +85,14 @@ python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password
   --output informe.html --template . --extended-html
 ```
 
-Asimismo se incluye `template_full.html`, una versión con 12 secciones estructuradas.
+Asimismo se incluye `template_full.html`, una versión pensada para un informe completo con portada e índice.
+Incluye 12 secciones: portada, resumen ejecutivo, introducción, resumen del entorno, análisis por categorías, indicadores de componentes, listados Top&nbsp;10, recomendaciones, conclusiones, glosario y anexos.
 Puede emplearse fácilmente con:
 ```bash
 python vmware_healthcheck.py --host <vcenter o esxi> --user <usuario> --password <contraseña> \
   --output informe.html --template . --full-html
 ```
+Las áreas de recomendaciones, conclusiones y glosario se generan con IA, por lo que debe configurarse OpenAI (variables de entorno o `openai_config.json`).
 
 El archivo `template_a_detailed.html` incluye ahora un pequeño índice clicable
 para navegar por las secciones principales del informe. Una vez generado el
