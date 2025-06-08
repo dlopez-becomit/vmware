@@ -1,6 +1,6 @@
 """Sección de almacenamiento del informe detallado."""
 
-from openai_connector import configure_openai, fetch_completion
+from openai_connector import fetch_completion
 
 INTRO = (
     "Esta sección revisa el estado de los datastores y la utilización de espacio. "
@@ -14,7 +14,6 @@ PROMPT_TEMPLATE = (
 
 def generate(data, model=None):
     """Genera el texto detallado para la sección de almacenamiento."""
-    configure_openai()
     prompt = PROMPT_TEMPLATE.format(data=data)
     messages = [
         {"role": "system", "content": "Eres un experto en VMware. Debes redactar un informe profesional."},

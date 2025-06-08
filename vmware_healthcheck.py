@@ -929,25 +929,78 @@ class VMwareHealthCheck:
                 elif template_file == 'template_a_detailed.html':
                     data = self._build_report_data(hosts_data, vm_data, chart)
                     try:
-                        from report_sections import (
-                            performance,
-                            storage,
-                            security,
-                            availability,
+                        from report_sections.performance import (
+                            generate as generate_performance, INTRO as INTRO_PERFORMANCE
                         )
+                        from report_sections.storage import (
+                            generate as generate_storage, INTRO as INTRO_STORAGE
+                        )
+                        from report_sections.security import (
+                            generate as generate_security, INTRO as INTRO_SECURITY
+                        )
+                        from report_sections.availability import (
+                            generate as generate_availability, INTRO as INTRO_AVAILABILITY
+                        )
+                        from openai_connector import configure_openai
 
-                        performance_text = performance.generate(data)
-                        storage_text = storage.generate(data)
-                        security_text = security.generate(data)
-                        availability_text = availability.generate(data)
+                        configure_openai()
+
+                        def score(name):
+                            for c in data.get('categories', []):
+                                if c.get('name') == name:
+                                    return c.get('score')
+                            return 0
+
+                        perf_info = {
+                            'score': score('Rendimiento'),
+                            'cpu_hosts': data.get('cpu_hosts'),
+                            'ram_hosts': data.get('ram_hosts'),
+                            'top_cpu_ready': data.get('top_cpu_ready'),
+                            'top_ram': data.get('top_ram'),
+                            'top_iops': data.get('top_iops'),
+                            'top_network': data.get('top_network'),
+                        }
+                        storage_info = {
+                            'score': score('Almacenamiento'),
+                            'datastore_usage': data.get('datastore_usage'),
+                            'datastores': data.get('datastores'),
+                            'top_disk_free': data.get('top_disk_free'),
+                        }
+                        security_labels = {
+                            'SSH', 'VMware Tools', 'Snapshots', 'Backups',
+                            'Licensing', 'IPv6', 'DNS'
+                        }
+                        security_info = {
+                            'score': score('Seguridad'),
+                            'indicators': [
+                                i for i in data.get('indicators', [])
+                                if i.get('label') in security_labels
+                            ],
+                        }
+                        avail_labels = {
+                            'HA', 'DRS', 'NTP', 'Updates', 'Round Robin',
+                            'vCPU/pCPU', 'Resource Pools'
+                        }
+                        availability_info = {
+                            'score': score('Disponibilidad'),
+                            'indicators': [
+                                i for i in data.get('indicators', [])
+                                if i.get('label') in avail_labels
+                            ],
+                        }
+
+                        performance_text = generate_performance(perf_info)
+                        storage_text = generate_storage(storage_info)
+                        security_text = generate_security(security_info)
+                        availability_text = generate_availability(availability_info)
                     except Exception as exc:  # pragma: no cover - external API
                         logger.error(
                             "Failed to generate detailed sections: %s", exc
                         )
-                        performance_text = getattr(performance, "INTRO", "")
-                        storage_text = getattr(storage, "INTRO", "")
-                        security_text = getattr(security, "INTRO", "")
-                        availability_text = getattr(availability, "INTRO", "")
+                        performance_text = INTRO_PERFORMANCE
+                        storage_text = INTRO_STORAGE
+                        security_text = INTRO_SECURITY
+                        availability_text = INTRO_AVAILABILITY
 
                     html_content = template.render(
                         **data,
