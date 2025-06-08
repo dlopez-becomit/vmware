@@ -10,6 +10,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from openai_report import generate_detailed_report
+from openai_connector import apply_azure_env_vars
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1240,6 +1241,13 @@ def main():
         args.template_file = 'template_full_es.html'
         if not args.detailed_report:
             args.detailed_report = args.output
+
+    if args.api_type == 'azure':
+        apply_azure_env_vars(force=True)
+        if not args.openai_config and os.path.isfile('openai_config_azure.json'):
+            args.openai_config = 'openai_config_azure.json'
+        if args.openai_config:
+            os.environ.setdefault('OPENAI_CONFIG_FILE', args.openai_config)
 
     checker = VMwareHealthCheck(args.host, args.user, args.password)
     try:
