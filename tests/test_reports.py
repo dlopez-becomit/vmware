@@ -325,3 +325,32 @@ def test_configure_openai_verbose_logs(monkeypatch, capsys):
     assert "missing.json" in captured
     assert "no definido" in captured.lower()
 
+
+def test_generate_detailed_report(monkeypatch):
+    """generate_detailed_report should call openai helper functions."""
+    from openai_report import generate_detailed_report
+    import openai_report
+
+    recorded = {}
+
+    def fake_configure_openai(**kwargs):
+        recorded['cfg'] = kwargs
+
+    def fake_fetch_completion(messages, model):
+        recorded['messages'] = messages
+        recorded['model'] = model
+        return 'text'
+
+    monkeypatch.setattr(openai_report, 'configure_openai', fake_configure_openai)
+    monkeypatch.setattr(openai_report, 'fetch_completion', fake_fetch_completion)
+
+    out = generate_detailed_report('sum', api_key='k', model='m',
+                                   api_type='azure', api_base='b', api_version='v')
+
+    assert out == 'text'
+    assert recorded['cfg']['api_key'] == 'k'
+    assert recorded['cfg']['api_type'] == 'azure'
+    assert recorded['cfg']['api_base'] == 'b'
+    assert recorded['cfg']['api_version'] == 'v'
+    assert recorded['model'] == 'm'
+
