@@ -1246,6 +1246,8 @@ def main():
         apply_azure_env_vars(force=True)
         if not args.openai_config and os.path.isfile('openai_config_azure.json'):
             args.openai_config = 'openai_config_azure.json'
+        if args.openai_config:
+            os.environ.setdefault('OPENAI_CONFIG_FILE', args.openai_config)
 
     checker = VMwareHealthCheck(args.host, args.user, args.password)
     try:
