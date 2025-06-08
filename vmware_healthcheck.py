@@ -628,7 +628,14 @@ class VMwareHealthCheck:
         return '\n'.join(html)
 
     def _build_report_data(self, hosts_data, vm_data, chart):
-        """Construye la estructura de datos para la plantilla avanzada."""
+        """Construye la estructura de datos para la plantilla avanzada.
+
+        Además de la información básica utilizada por ``template_a.html`` se
+        calculan datos adicionales que pueden ser consumidos por plantillas más
+        completas como ``template_full.html``.  No se trata de un análisis
+        exhaustivo pero proporciona un resumen global, los riesgos detectados y
+        algunas recomendaciones genéricas.
+        """
         import datetime
 
         def status_from_score(score):
@@ -791,10 +798,27 @@ class VMwareHealthCheck:
             reverse=True
         )[:10]
 
+        # Extract main risks and priorities from indicators
+        risks = [i['label'] for i in indicators if i.get('status') == 'critical']
+        priorities = [i['label'] for i in indicators if i.get('status') == 'warning']
+
+        global_state = health_msg
+        key_risks = ', '.join(risks[:3]) if risks else 'Ninguno'
+
+        recommendations = (
+            'Revisar los elementos en estado crítico o de advertencia y planificar '
+            'acciones correctivas.'
+        )
+        conclusions = f'El entorno se encuentra en estado {health_msg.lower()}.'
+        glossary = 'VM: Virtual Machine, HA: High Availability, DRS: Distributed Resource Scheduler'
+        annexes_data = []
+
         return {
             'health_score': health_score,
             'health_state': health_state,
             'health_message': health_msg,
+            'global_state': global_state,
+            'key_risks': key_risks,
             'uptime': f"{int(avg_uptime_days)} días",
             'alerts': 0,
             'sla': '100%',
@@ -813,12 +837,28 @@ class VMwareHealthCheck:
             'top_disk_free': top_disk_free,
             'top_iops': top_iops,
             'top_network': top_network,
+            'risks': risks,
+            'priorities': priorities,
+            'recommendations': recommendations,
+            'conclusions': conclusions,
+            'glossary': glossary,
+            'annexes_data': annexes_data,
             'report_date': datetime.datetime.utcnow().strftime('%d-%m-%Y'),
             'chart': chart,
         }
 
-    def _validate_report_data(self, data):
-        """Verify that report data has all fields required by the templates."""
+    def _validate_report_data(self, data, template_file=None):
+        """Verify that report data has all fields required by the templates.
+
+        Parameters
+        ----------
+        data : dict
+            Data dictionary returned by ``_build_report_data``.
+        template_file : str, optional
+            Name of the template that will consume the data. Additional keys are
+            checked when ``template_full.html`` is used.
+        """
+
         required = {
             'health_score', 'health_state', 'health_message', 'uptime', 'alerts',
             'sla', 'hosts', 'vms', 'datastores_count', 'networks_count',
@@ -826,6 +866,13 @@ class VMwareHealthCheck:
             'indicators', 'top_cpu_ready', 'top_ram', 'datastores',
             'top_disk_free', 'top_iops', 'top_network', 'report_date'
         }
+
+        if template_file == 'template_full.html':
+            required |= {
+                'global_state', 'key_risks', 'risks', 'priorities',
+                'recommendations', 'conclusions', 'glossary', 'annexes_data'
+            }
+
         missing = [k for k in required if k not in data]
         if missing:
             logger.error("Report data missing keys: %s", ", ".join(missing))
@@ -939,11 +986,11 @@ class VMwareHealthCheck:
                 template = env.get_template(template_file)
                 if template_file == 'template_a.html':
                     data = self._build_report_data(hosts_data, vm_data, chart)
-                    self._validate_report_data(data)
+                    self._validate_report_data(data, template_file)
                     html_content = template.render(**data)
                 elif template_file == 'template_a_detailed.html':
                     data = self._build_report_data(hosts_data, vm_data, chart)
-                    self._validate_report_data(data)
+                    self._validate_report_data(data, template_file)
                     try:
                         from report_sections.performance import (
                             generate as generate_performance, INTRO as INTRO_PERFORMANCE
@@ -1025,6 +1072,10 @@ class VMwareHealthCheck:
                         security_text=security_text,
                         availability_text=availability_text,
                     )
+                elif template_file == 'template_full.html':
+                    data = self._build_report_data(hosts_data, vm_data, chart)
+                    self._validate_report_data(data, template_file)
+                    html_content = template.render(**data)
                 else:
                     html_content = template.render(
                         hosts=hosts_data, vms=vm_data, chart=chart
