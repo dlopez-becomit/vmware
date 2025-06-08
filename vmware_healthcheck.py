@@ -1223,6 +1223,10 @@ def main():
                         help='use template_full.html and enable detailed report generation (produces the structured 12-section report)')
     parser.add_argument('--full-html-es', action='store_true',
                         help='use template_full_es.html (versi\xc3\xb3n en espa\xc3\xb1ol) and enable detailed report generation')
+    parser.add_argument('--api-type', choices=['openai', 'azure'],
+                        help='select OpenAI backend (openai or azure)')
+    parser.add_argument('--openai-config',
+                        help='path to JSON file with OpenAI/Azure settings')
     args = parser.parse_args()
     if args.extended_html:
         args.template_file = 'template_a_detailed.html'
@@ -1342,7 +1346,13 @@ def main():
             else:
                 try:
                     summary_text = checker.build_text_summary(hosts_data, summary)
-                    detailed_text = generate_detailed_report(summary_text, api_key, model)
+                    detailed_text = generate_detailed_report(
+                        summary_text,
+                        api_key,
+                        model,
+                        api_type=args.api_type,
+                        config_file=args.openai_config,
+                    )
                     if not args.output or args.detailed_report != args.output:
                         with open(args.detailed_report, 'w', encoding='utf-8') as f:
                             f.write(detailed_text)
