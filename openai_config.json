@@ -1,0 +1,7 @@
+{
+  "api_key": "sk-REEMPLAZA_CON_TU_CLAVE",
+  "api_type": "openai",
+  "api_base": "",
+  "api_version": "",
+  "model": "gpt-3.5-turbo"
+}
