@@ -1,13 +1,15 @@
 """Helper to request a detailed report from OpenAI or Azure OpenAI."""
 
+from typing import Optional
+
 from openai_connector import configure_openai, fetch_completion
 
 
 def generate_detailed_report(summary: str, api_key: str, model: str,
-                             api_type: str | None = None,
-                             api_base: str | None = None,
-                             api_version: str | None = None,
-                             config_file: str | None = None) -> str:
+                             api_type: Optional[str] = None,
+                             api_base: Optional[str] = None,
+                             api_version: Optional[str] = None,
+                             config_file: Optional[str] = None) -> str:
     """Generates a professional VMware report using OpenAI or Azure OpenAI.
 
     Parameters
