@@ -818,23 +818,74 @@ class VMwareHealthCheck:
         }
 
     def build_text_summary(self, hosts_data, summary):
-        """Build a plain text summary of the collected information."""
+        """Build a plain text summary similar to ``template_a.html``."""
+        # Aggregate VM list from hosts
+        vm_data = [vm for h in hosts_data for vm in h.get('vms', [])]
+
+        # Reuse the logic from ``_build_report_data`` to obtain scores and lists
+        data = self._build_report_data(hosts_data, vm_data, chart=None)
+
         lines = []
-        lines.append("Resumen del entorno:")
-        for k, v in summary.items():
-            lines.append(f"- {k}: {v}")
-        for h in hosts_data:
-            lines.append("")
-            lines.append(f"Host {h.get('name')}")
-            lines.append("Seguridad:")
-            for k, v in h.get('security', {}).items():
-                lines.append(f"  {k}: {v}")
-            lines.append("Rendimiento:")
-            for k, v in h.get('performance', {}).items():
-                lines.append(f"  {k}: {v}")
-            lines.append("Buenas prácticas:")
-            for k, v in h.get('best_practice', {}).items():
-                lines.append(f"  {k}: {v}")
+
+        # Health score section
+        lines.append(
+            f"Health Score: {data['health_score']} - {data['health_message']}"
+        )
+        lines.append(
+            f"Hosts: {summary.get('hosts', 0)}, VMs: {summary.get('vms', 0)}, "
+            f"Datastores: {summary.get('datastores', 0)}, Networks: {summary.get('networks', 0)}"
+        )
+
+        # Category summaries
+        lines.append("\nResumen de Categorías:")
+        for cat in data['categories']:
+            lines.append(
+                f"- {cat['name']}: {cat['score']}% ({cat['status']})"
+            )
+
+        # Key indicators
+        lines.append("\nIndicadores:")
+        for ind in data['indicators']:
+            lines.append(
+                f"- {ind['label']}: {ind['text']} ({ind['status']})"
+            )
+
+        # Top lists
+        lines.append("\nTop 10 CPU Ready (ms):")
+        for vm in data['top_cpu_ready']:
+            lines.append(
+                f"  {vm['name']}: {vm['metrics'].get('cpu_ready_ms', 0)}"
+            )
+
+        lines.append("\nTop 10 RAM Promedio (%):")
+        for vm in data['top_ram']:
+            pct = round(vm['metrics'].get('mem_usage_pct', 0) * 100, 2)
+            lines.append(f"  {vm['name']}: {pct}")
+
+        lines.append("\nTop 10 Datastores por Capacidad (GB):")
+        for ds in data['datastores']:
+            lines.append(
+                f"  {ds['name']}: {ds.get('capacity_gb', 0)}"
+            )
+
+        lines.append("\nTop 10 Disc Free (%):")
+        for vm in data['top_disk_free']:
+            lines.append(
+                f"  {vm['name']}: {vm['free_pct']}"
+            )
+
+        lines.append("\nTop 10 IOPS:")
+        for vm in data['top_iops']:
+            lines.append(
+                f"  {vm['name']}: {vm['metrics'].get('iops', 0)}"
+            )
+
+        lines.append("\nTop 10 Uso Red Prom (KBps):")
+        for vm in data['top_network']:
+            lines.append(
+                f"  {vm['name']}: {vm['metrics'].get('net_throughput_kbps', 0)}"
+            )
+
         return "\n".join(lines)
 
     def generate_report(self, hosts_data, vm_data, output_file, template_dir=None,
