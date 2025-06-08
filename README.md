@@ -91,6 +91,8 @@ reconocidas por la librería `openai`.
 ```bash
 python check_azure_openai_connection.py
 ```
+Si no se indica un archivo de configuración concreto, el script buscará
+automáticamente `openai_config_azure.json` en el directorio actual.
 Si también se indica `--output`, el texto se incluirá al final del HTML.
 Adicionalmente, se incluye `template_a.html`, una plantilla avanzada con un formato extendido y botones para exportar o imprimir el informe. Para utilizarla basta con indicar el directorio donde se encuentra mediante `--template` y pasar `--template-file template_a.html`.
 
